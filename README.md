@@ -143,8 +143,9 @@ cloisonnement, aucun sélecteur mort. Les contrastes texte/fond sont au niveau A
   avant mise en route ; une cliente qui a déjà laissé deux commandes annulées paie un acompte quel que soit le
   montant. Dans tous les cas la commande part **après confirmation de la cliente** : bouton sur `/paiement`
   et `/suivi`, ou lien `/confirmer/<réf>/<code>` qui marche **sans JavaScript** (un simple formulaire POST),
-  ou message WhatsApp pré-rempli. Le code est écrit en clair sur la page et dans le bordereau : le livreur
-  le demande à la remise.
+  ou message WhatsApp pré-rempli. Une référence ou un code qui ne colle pas renvoie une page
+  « rien à confirmer » en 404 — jamais un bouton vide. Le code est écrit en clair sur la page et dans le
+  bordereau : le livreur le demande à la remise.
 - **Variante = taille et/ou coloris** : le stock demandé est la **somme** des variantes qui correspondent,
   donc choisir seulement une taille est légal. Le décrément se répartit du coloris le plus fourni au moins
   fourni ; l'annulation remet tout en rayon.
@@ -302,7 +303,7 @@ dans `render.yaml`). Alternative gratuite : sauvegarder régulièrement `data/fa
 npm run check:css    # 8 checks : thème (palette Prestige), variables réellement définies, aucun
                      # sélecteur mort (le CSS qui ne sert à rien est une dette), cloisonnement
                      # boutique / back-office
-npm run smoke        # 184 checks : catalogue, commande, stock par variante, paiement, admin, zones,
+npm run smoke        # 185 checks : catalogue, commande, stock par variante, paiement, admin, zones,
                      # sécurité ; rendu serveur + balisage + sitemap + robots ; pipeline d'images
                      # (AVIF plus léger que WebP, cache disque, chemin tordu refusé) ; avis et
                      # modération ; alertes de retour en stock ; panier enregistré et reprise ;

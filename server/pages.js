@@ -557,28 +557,34 @@ function faqDepuisMarkdown(corps) {
 
 /* Page de confirmation d'une commande en espèces : un simple bouton, aucun
    compte, aucun JavaScript nécessaire (le lien est envoyé sur WhatsApp). */
-function confirmation(req, { cmd, dejaConfirme = false, ok = false, erreur = '' }) {
+function confirmation(req, { cmd, dejaConfirme = false, ok = false, erreur = '', introuvable = false }) {
   const cfg = reglages(req);
+  /* `introuvable` : référence inconnue ou code qui ne colle pas. On n'affiche alors
+     ni le récapitulatif ni le bouton « je confirme » — il n'y a rien à confirmer. */
   const corps = `
   ${entete(cfg)}
   <section class="blk"><div class="wrap center cadre-confiance">
-    <h1>${cmd.statut === 'annulee' ? 'Cette commande est annulée' : ok || dejaConfirme || cmd.client_confirme_le ? 'Commande confirmée ✔' : 'Confirme ta commande'}</h1>
-    <p class="muted">Référence <span class="mono">${ech(cmd.reference)}</span> · ${ech(cmd.client)} · ${fcfa(cmd.total)}${cmd.frais ? ` (dont livraison ${fcfa(cmd.frais)})` : ''}</p>
+    <h1>${introuvable ? 'Ce lien ne correspond à aucune commande' : cmd.statut === 'annulee' ? 'Cette commande est annulée' : ok || dejaConfirme || cmd.client_confirme_le ? 'Commande confirmée ✔' : 'Confirme ta commande'}</h1>
+    ${introuvable
+      ? `<p class="muted">Référence <span class="mono">${ech(cmd.reference)}</span> — soit le code de six lettres qui termine le lien n'est pas le bon, soit la commande a été annulée et le stock est reparti en rayon.</p>`
+      : `<p class="muted">Référence <span class="mono">${ech(cmd.reference)}</span> · ${ech(cmd.client)} · ${fcfa(cmd.total)}${cmd.frais ? ` (dont livraison ${fcfa(cmd.frais)})` : ''}</p>`}
     ${erreur ? `<div class="banner ko">${ech(erreur)}</div>` : ''}
-    ${cmd.code_confirmation ? `<div class="code-conf"><span class="et">${cmd.paiement === 'especes' ? (cmd.mode === 'retrait' ? 'Code à donner en boutique' : 'Code à donner au livreur') : 'Code de confirmation'}</span><b>${ech(cmd.code_confirmation)}</b></div>` : ''}
-    <div class="recap">
+    ${!introuvable && cmd.code_confirmation ? `<div class="code-conf"><span class="et">${cmd.paiement === 'especes' ? (cmd.mode === 'retrait' ? 'Code à donner en boutique' : 'Code à donner au livreur') : 'Code de confirmation'}</span><b>${ech(cmd.code_confirmation)}</b></div>` : ''}
+    ${introuvable ? '' : `<div class="recap">
       <div><span class="muted">Sous-total</span><span>${fcfa(cmd.sous_total || 0)}</span></div>
       <div><span class="muted">Livraison</span><span>${cmd.frais ? fcfa(cmd.frais) : 'offerte'}</span></div>
       ${(cmd.acompte || 0) > 0 ? `<div><span class="muted">Acompte à envoyer</span><span>${fcfa(cmd.acompte)}</span></div>
         <div><span class="muted">Reste à payer ${cmd.mode === 'retrait' ? 'au retrait' : 'au livreur'}</span><span>${fcfa(cmd.reste_a_payer || 0)}</span></div>` : ''}
       <div class="tot"><span>Total commande</span><span>${fcfa(cmd.total)}</span></div>
-    </div>
-    ${ok || dejaConfirme || cmd.client_confirme_le
-      ? `<div class="banner ok">Merci ✔ La boutique est prévenue : on t’appelle avant que le livreur parte.${cmd.paiement === 'especes' ? `<br>À préparer : <b>${fcfa(cmd.reste_a_payer || cmd.total)}</b> à donner ${cmd.mode === 'retrait' ? 'au retrait' : 'au livreur'}.</div>` : '</div>'}</div>`
-      : cmd.statut === 'annulee'
-        ? '<div class="banner warn">Le stock est reparti en rayon. Pour recommander : <a href="/boutique">retour à la boutique</a>.</div>'
-        : `<div class="bloc">
-             <p>Un clic et la boutique sait que tu es bien prête à recevoir. Ça évite qu’un livreur parte pour rien — et ça garde ta commande vivante.</p>
+    </div>`}
+    ${introuvable
+      ? `<div class="banner warn">Pas de panique : écris « ${ech(cmd.reference)} » à la boutique sur WhatsApp, ou reprends le suivi avec ton numéro depuis <a href="/suivi">Suivre ma commande</a>. Si rien n’apparaît là non plus, la commande n’a pas abouti — rien ne t’a été demandé.</div>`
+      : ok || dejaConfirme || cmd.client_confirme_le
+        ? `<div class="banner ok">Merci ✔ La boutique est prévenue : on t’appelle avant que le livreur parte.${cmd.paiement === 'especes' ? `<br>À préparer : <b>${fcfa(cmd.reste_a_payer || cmd.total)}</b> à donner ${cmd.mode === 'retrait' ? 'au retrait' : 'au livreur'}.</div>` : '</div>'}</div>`
+        : cmd.statut === 'annulee'
+          ? '<div class="banner warn">Le stock est reparti en rayon. Pour recommander : <a href="/boutique">retour à la boutique</a>.</div>'
+          : `<div class="bloc">
+             <p>Un clic et la boutique sait que tu es bien prête à recevoir. Ça évite qu'un livreur parte pour rien — et ça garde ta commande vivante.</p>
              <form method="post" action="/confirmer/${ech(cmd.reference)}/${ech(cmd.code_confirmation || '')}">
                <button class="btn gold big" type="submit">✔ Oui, je confirme ma commande</button>
              </form>
@@ -595,7 +601,7 @@ function confirmation(req, { cmd, dejaConfirme = false, ok = false, erreur = '' 
   ${pied(cfg)}`;
   return pageHTML({
     cfg,
-    titre: `Confirmation ${cmd.reference} — ${cfg.nom_boutique}`,
+    titre: `${introuvable ? 'Lien de confirmation introuvable' : 'Confirmation ' + cmd.reference} — ${cfg.nom_boutique}`,
     description: 'Confirme ta commande en un clic.',
     url: `${cfg._url}/confirmer/${cmd.reference}`,
     image: '/media/demo/lookbook.jpg',

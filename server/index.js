@@ -243,7 +243,17 @@ for (const slugP of PAGES_SLUGS) {
 app.get('/confirmer/:reference/:code', (req, res, next) => {
   try {
     const { cmd, erreur } = retrouverCommande(req);
-    reponseHTML(res, SEO.confirmation(req, { cmd: cmd || COMMANDE_VIDE, erreur: cmd ? erreur : erreur || '' }), cmd ? 200 : 404);
+    /* Rien trouvé (référence inconnue ou code qui ne colle pas) : surtout pas le
+       formulaire « Oui, je confirme » d'une commande vide. Une page qui explique,
+       en 404, pour que Google n'indexe rien et que la cliente sache quoi faire. */
+    if (!cmd) {
+      return reponseHTML(res, SEO.confirmation(req, {
+        cmd: { ...COMMANDE_VIDE, reference: String(req.params.reference || '').toUpperCase() || '—' },
+        erreur: erreur || 'Commande introuvable.',
+        introuvable: true,
+      }), 404);
+    }
+    reponseHTML(res, SEO.confirmation(req, { cmd }), 200);
   } catch (e) {
     console.error('[confirmer] GET :', e.message);
     next();

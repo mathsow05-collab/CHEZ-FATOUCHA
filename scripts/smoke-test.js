@@ -484,6 +484,15 @@ const J = async (method, url, body, token) => {
     check('le code à donner au livreur est écrit en clair sur la page', /Code à donner|code de confirmation/i.test(txtConf) || /confirme/i.test(txtConf));
     check('la page de confirmation est noindex et sans code pour un curieux', /noindex/.test(txtConf));
     check('un mauvais code sur le lien de confirmation est refusé', (await fetch(BASE + `/confirmer/${refGrosse}/ABCDEF`)).status === 400 || /plus valable/.test(await (await fetch(BASE + `/confirmer/${refGrosse}/ABCDEF`)).text()));
+    const rMorte = await fetch(BASE + '/confirmer/CMD-PAS-UNE-VRAIE-REF/ABC123');
+    const htmlMorte = await rMorte.text();
+    check('un lien de confirmation sans commande derrière : 404, et on ne propose pas de confirmer',
+      rMorte.status === 404
+      && /Ce lien ne correspond à aucune commande/.test(htmlMorte)
+      && !/Oui, je confirme/.test(htmlMorte)
+      && !/<form/.test(htmlMorte)
+      && !/class="recap"/.test(htmlMorte),
+      `${rMorte.status} · ${(htmlMorte.match(/<h1[^>]*>([^<]{0,60})/) || [])[1] || 'sans titre'}`);
 
     console.log('— Réassurance et recommandations sur la fiche —');
     const listePourFiche = (await J('GET', '/api/produits')).data;
