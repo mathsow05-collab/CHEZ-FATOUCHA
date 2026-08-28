@@ -1,0 +1,47 @@
+# Blueprint Render — CHEZ FATOUCHA  (https://render.com/docs/blueprint-spec)
+#
+# ✅ Fichier à la RACINE du dépôt `CHEZ-FATOUCHA`, branche `main` : c'est le seul
+#    endroit où Render cherche `render.yaml` par défaut (sinon : « Blueprint file
+#    render.yaml not found on main branch »).
+#
+# ⚠️ Plan gratuit = disque temporaire : la base SQLite et les photos téléversées
+#    repartent du seed à chaque redéploiement. Pour une vraie boutique : passer le
+#    service en plan `starter` et dé-commenter le bloc `disk` (+ DATA_DIR/UPLOADS_DIR).
+services:
+  - type: web
+    name: chez-fatoucha
+    runtime: node
+    plan: free
+    region: frankfurt
+    # L'app est à la racine du dépôt → pas de rootDir nécessaire.
+    buildCommand: npm install --omit=dev --no-audit --no-fund
+    startCommand: node server/index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Ne PAS définir PORT : Render injecte le sien, le serveur le lit (process.env.PORT).
+      - key: JWT_SECRET
+        generateValue: true
+      # Compte vendeur créé au premier lancement (change-les !)
+      - key: ADMIN1_USERNAME
+        sync: false
+      - key: ADMIN1_PASSWORD
+        sync: false
+      # auto = CinetPay si les clés sont présentes, sinon mode manuel Wave/Orange Money
+      - key: PAYEMENT_MODE
+        value: auto
+      # À renseigner après l'ouverture d'un compte marchand CinetPay :
+      - key: CINETPAY_SITE_ID
+        sync: false
+      - key: CINETPAY_API_KEY
+        sync: false
+      # --- Plan payant uniquement (disque persistant) ---
+      # - key: DATA_DIR
+      #   value: /var/data/fatoucha
+      # - key: UPLOADS_DIR
+      #   value: /var/data/fatoucha/uploads
+    # disk:
+    #   - name: fatoucha-data
+    #     mountPath: /var/data/fatoucha
+    #     sizeInGB: 1

@@ -1,0 +1,14 @@
+# Dépendances
+node_modules/
+
+# Secrets & config locale
+.env
+
+# Données locales (base SQLite + photos téléversées) — à sauvegarder séparément
+data/
+uploads/
+
+# Divers
+*.log
+.DS_Store
+demo-accounts.txt
