@@ -168,15 +168,6 @@ Paramètres utilisés (et vérifiables dans Settings) : runtime Node · plan `fr
 New → Web Service → repo → *Advanced* → Runtime Node, puis les mêmes Build/Start/Health que ci-dessus
 et les mêmes variables d'environnement. Utile si tu ne veux pas lier un Blueprint.
 
-### Si tu préfères garder la boutique dans `nom-s2-reussite` (monorepo)
-Deux possibilités, dans l'ordre de préférence :
-1. **Blueprint + Blueprint Path** : au moment de créer le Blueprint, indique le chemin du fichier
-   (ex. `fatoucha/render.yaml`) — Render ne cherche plus `render.yaml` uniquement à la racine.
-   (Et dans le service : `rootDir: fatoucha`, déjà écrit dans cette version.)
-2. **Web Service simple** : Root Directory = `fatoucha`, build `npm install --omit=dev --no-audit --no-fund`,
-   start `npm start` — et **pas de Blueprint** (ou alors ajoute le service `chez-fatoucha`
-   dans le `render.yaml` **racine** du monorepo, car un Blueprint n'accepte qu'un seul fichier à la racine).
-
 ### Persistance (à lire avant d'ouvrir la boutique)
 Plan gratuit = disque éphémère : commandes et photos repartent du seed à chaque déploiement.
 Pour conserver : Render **Starter** + *Disk* monté sur `/var/data/fatoucha`, avec
