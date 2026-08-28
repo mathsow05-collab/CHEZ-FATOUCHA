@@ -17,6 +17,9 @@ services:
     buildCommand: npm install --omit=dev --no-audit --no-fund
     startCommand: node server/index.js
     healthCheckPath: /api/health
+    # Node 20 = version testée (majeur LTS) : figé via .node-version pour éviter
+    # qu'une nouvelle LTS casse le binaire natif de better-sqlite3.
+    envVars:
     envVars:
       - key: NODE_ENV
         value: production
