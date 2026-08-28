@@ -45,7 +45,6 @@ const J = async (method, url, body, token) => {
       ...process.env, PORT,
       DATA_DIR: path.join(DATA, 'data'), UPLOADS_DIR: path.join(DATA, 'uploads'),
       JWT_SECRET: 'secret-test-front', ADMIN1_USERNAME: 'admin', ADMIN1_PASSWORD: 'test12345',
-      CHEMIN_ADMIN: '/gestion-fatou',
       ADMIN2_USERNAME: '', ADMIN2_PASSWORD: '',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -191,20 +190,20 @@ const J = async (method, url, body, token) => {
 
     /* --- l'espace vendeur est privé : la cliente ne doit rien en voir --- */
     check('boutique : aucun lien « Espace vendeur » dans l’écran', !/Espace vendeur/.test(d.body.textContent));
-    check('boutique : aucun lien, même caché, vers le back-office', !d.querySelector('a[href*="admin"], a[href*="gestion"]'));
-    check('boutique : le HTML reçu ne mentionne pas le chemin privé', !/gestion-fatou|adm-root/.test(d.documentElement.outerHTML));
+    check('boutique : aucun lien, même caché, vers le back-office', !d.querySelector('a[href*="admin"]'));
+    check('boutique : le HTML reçu ne contient ni chrome ni code du back-office', !/adm-root|adm-tabs|adm-login/.test(d.documentElement.outerHTML));
     w.location.hash = '#/admin';
     await wait(250);
-    check('vieux favori #/admin : la boutique s’affiche, jamais le back-office', d.querySelectorAll('.card').length > 0 && !d.querySelector('.adm-tabs'));
+    check('ancienne route #/admin : la boutique s’affiche, jamais le back-office', d.querySelectorAll('.card').length > 0 && !d.querySelector('.adm-tabs'));
     w.location.hash = '#/';
     await until(() => d.querySelectorAll('.card').length > 0, { label: 'retour catalogue' });
 
     /* --- espace vendeur : page séparée /admin, ouverte dans sa propre fenêtre --- */
-    domAdm = await JSDOM.fromURL(BASE + '/gestion-fatou#produits', { ...opts, beforeParse: (window) => { brancher(window); window.localStorage.setItem('fatoucha_admin_token', jetonAdmin); } });
+    domAdm = await JSDOM.fromURL(BASE + '/admin#produits', { ...opts, beforeParse: (window) => { brancher(window); window.localStorage.setItem('fatoucha_admin_token', jetonAdmin); } });
     const wa = domAdm.window;
     const da = wa.document;
     check('admin : page indépendante du catalogue (pas de panier, pas de hero)', da.querySelectorAll('.card').length === 0 && !/Ajouter au panier/.test(da.body.textContent));
-    check('admin : servie sur le chemin privé, sans #/ dans l’URL', domAdm.window.location.pathname === '/gestion-fatou', domAdm.window.location.pathname);
+    check('admin : sa propre URL, sans #/ dans le chemin', domAdm.window.location.pathname === '/admin', domAdm.window.location.pathname);
     await until(() => da.querySelectorAll('[data-edit]').length > 0, { label: 'table admin' });
     check('admin : onglets propres à l’espace vendeur, aucun menu cliente', !!da.querySelector('.adm-tabs') && !da.querySelector('nav.main') && !da.querySelector('[data-cart-count]'));
     check('admin : marque de la boutique rappelée', /CHEZ FATOUCHA/i.test(da.querySelector('.adm-top').textContent));

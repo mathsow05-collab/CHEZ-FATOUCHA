@@ -16,7 +16,7 @@ pour valider son panier** — Wave ou Orange Money.
 npm install
 cp .env.example .env          # optionnel en dev : des valeurs par défaut existent
 npm run check:css             # contrôle du thème (syntaxe, variables, cloisonnement boutique/back-office)
-npm run smoke                 # 89 vérifications API + pages servies (boutique, commande, paiement, admin)
+npm run smoke                 # 90 vérifications API + pages servies (boutique, commande, paiement, admin)
 npm run test:front            # 53 vérifications du rendu réel (jsdom) : parcours client + espace vendeur
 npm start                     # http://localhost:3000
 ```
@@ -24,18 +24,17 @@ npm start                     # http://localhost:3000
 | URL | Ce que c'est |
 | --- | --- |
 | `http://localhost:3000/#/` | la boutique côté cliente |
-| `http://localhost:3000/gestion-fatou` | **l'espace vendeur — page privée, à son propre lien** |
+| `http://localhost:3000/admin` | **l'espace vendeur — sa propre page (aucun lien côté cliente)** |
 | `http://localhost:3000/api/health` | sonde de vie (Render l'utilise) |
 
 Compte admin du premier lancement : variables `ADMIN1_USERNAME` / `ADMIN1_PASSWORD`
 (par défaut `admin` / `fatoucha2026` en local — **à changer absolument**).
 
-> L'espace vendeur n'apparaît **nulle part** dans la boutique : aucun lien, aucun bouton,
-> aucun menu, et **aucune trace de son URL** dans le HTML, le JS ou le CSS reçus par une
-> cliente. C'est une page à part, à ouvrir (ou à mettre en favori) : en local
-> `http://localhost:3000/gestion-fatou`, en ligne `https://<ton-domaine>/gestion-fatou`.
-> Le chemin se change avec une variable : `CHEMIN_ADMIN=/ton-url` (voir `.env.example`).
-> Taper `/admin` renvoie désormais « Page introuvable ».
+> L'espace vendeur a **son propre lien** : `/admin` (en local `http://localhost:3000/admin`,
+> en ligne `https://<ton-domaine>/admin`). Il n'apparaît **nulle part** dans la boutique :
+> aucun lien, aucun bouton, aucun menu, aucune route interne — et ni son HTML, ni son JS,
+> ni son CSS ne sont chargés pour une cliente. Mets-le en favori, ou change le chemin avec
+> `CHEMIN_ADMIN` (voir `.env.example`) si un jour tu veux qu'il ne s'appelle plus `/admin`.
 
 ---
 
@@ -53,15 +52,15 @@ Compte admin du premier lancement : variables `ADMIN1_USERNAME` / `ADMIN1_PASSWO
 - **Suivi** : `#/suivi` avec référence + numéro → timeline *reçue → payée → préparation → expédiée → livrée*,
   total, articles, délai estimé, bouton WhatsApp, annulation tant que rien n'est payé.
 
-### Côté admin — `/gestion-fatou`, page privée à son propre lien
+### Côté admin — `/admin`, une page à part
 
-Le back-office n'est pas une page du site : c'est un petit fichier autonome
-(`admin-ui/`) que le serveur ne sert que sur `CHEMIN_ADMIN` (défaut `/gestion-fatou`).
-Les fichiers sont **hors de `public/`** : aucune URL statique ne peut les attraper.
-Ouverture : ajoute le lien en favori, c'est tout. Le changement d'onglet se fait par hash
-interne (`/gestion-fatou#commandes`), donc rien à configurer côté serveur ni à partager :
-cette URL, tu es la seule à la connaître. (L'API, elle, reste sur `/api/admin/*` : elle est
-derrière jeton de session + mot de passe — une URL connue ne donne donc aucun accès.)
+Le back-office n'est pas une vue de la boutique : ce sont trois fichiers autonomes
+(`admin-ui/`) que le serveur ne sert que sur `/admin` (variable `CHEMIN_ADMIN` pour le
+déplacer). Ils vivent **hors de `public/`**, donc aucune URL statique ne peut les attraper,
+et la boutique ne contient aucun lien vers eux. Le changement d'onglet se fait par hash
+interne (`/admin#commandes`) : rien à configurer côté serveur, une seule URL à connaître.
+(L'API reste sur `/api/admin/*` derrière jeton de session + mot de passe : connaître une URL
+ne donne aucun accès.)
 
 
 | Onglet | Contenu |
@@ -74,9 +73,10 @@ derrière jeton de session + mot de passe — une URL connue ne donne donc aucun
 
 ### Le thème (boutique et admin)
 
-Rose poudré, prune, doré, arrondis : tout part des variables en haut de `public/css/style.css`
-(`--ink`, `--paper`, `--rose`, `--rose-soft`, `--blush`, `--lilac`, `--gold`, `--line`, `--r`,
-`--serif`). Change une ligne, tout le site suit. La page du back-office
+Rose poudré, prune, lilas, doré, gros arrondis : tout part des variables en haut de
+`public/css/style.css` — `--ink: #3a1a30` (prune, jamais noir), `--paper: #fdf2f6`,
+`--rose: #d9558a`, `--rose-2: #b23267`, `--rose-soft`, `--blush`, `--lilac`, `--gold`,
+`--line`, `--r: 20px` / `--r-lg: 28px`, `--serif` pour les titres. Change une ligne, tout le site suit. La page du back-office
 (`admin-ui/admin.css`) reprend exactement les mêmes variables — elle est assortie à la
 boutique sans la resservir. Les règles propres à l'admin (tableaux, KPI, grille de stock,
 glisser-déposer) ont quitté `style.css` : la cliente ne télécharge pas le CSS du back-office.
@@ -193,7 +193,7 @@ Dépendances : `express`, `better-sqlite3`, `multer` — et rien d'autre en prod
 2. Render → **New + → Blueprint** → sélectionne `mathsow05-collab/CHEZ-FATOUCHA` →
    Render affiche **1 nouveau service `chez-fatoucha`**.
 3. Renseigne les variables marquées `sync: false` : `ADMIN1_USERNAME`, `ADMIN1_PASSWORD`,
-   éventuellement `CHEMIN_ADMIN` (URL du back-office — sinon `/gestion-fatou`),
+   éventuellement `CHEMIN_ADMIN` (déplacer le back-office hors de `/admin`),
    (optionnel) `CINETPAY_SITE_ID`, `CINETPAY_API_KEY`. `JWT_SECRET` est généré tout seul.
 4. **Create Blueprint** → build → l'URL est du genre `https://chez-fatoucha.onrender.com`.
 5. Ensuite, chaque `git push` sur `main` redéploie automatiquement.
@@ -230,9 +230,9 @@ dans `render.yaml`). Alternative gratuite : sauvegarder régulièrement `data/fa
 
 ```bash
 npm run check:css    # 8 checks : thème (palette féminine), variables, cloisonnement CSS
-npm run smoke        # 89 checks : catalogue, commande, stock, paiement, admin, zones, sécurité,
-                     # + « la page privée est bien séparée, introuvable par URL, et aucune
-                     #  trace de son chemin dans ce que reçoit la cliente »
+npm run smoke        # 90 checks : catalogue, commande, stock, paiement, admin, zones, sécurité,
+                     # + « le back-office a sa propre page, ses fichiers sont injoignables
+                     #  et rien, côté cliente, n'y mène ou ne les contient »
 npm run test:front   # 53 checks : parcours client réel dans un DOM (jsdom), puis back-office
                      # ouvert sur son chemin privé dans sa propre fenêtre (onglets, produits,
                      # commandes, validation du paiement)
@@ -247,8 +247,9 @@ npm run test:front   # 53 checks : parcours client réel dans un DOM (jsdom), pu
 | Render renvoie 404 sur `/api/health` | mauvais Root Directory (monorepo) ou service lancé sur le mauvais dépôt |
 | Commandes perdues après un redéploiement | plan gratuit sans disque → voir §7 |
 | « Le prestataire de paiement ne répond pas » | pas de clés CinetPay → mode manuel utilisé (normal) ; ou clés invalides → vérifier Site ID/API key |
-| Je ne vois pas l'espace admin, normal ? | Oui côté cliente : il n'a aucun lien ni aucune trace. Ouvre ton favori : `https://<ton-domaine>/gestion-fatou` (chemin = `CHEMIN_ADMIN`) |
-| `/admin` → « Page introuvable » | voulu : le back-office n'est plus là. Si tu as changé `CHEMIN_ADMIN`, c'est la nouvelle URL ; redémarre le serveur après modification de `.env` |
+| Je ne vois pas l'espace admin dans la boutique | voulu : aucun lien n'y mène. Ouvre directement `https://<ton-domaine>/admin` |
+| `/admin` affiche le catalogue | c'était l'ancien code : vide le cache (Maj+F5). La page du back-office doit contenir `id="adm-root"` dans son code source |
+| J'ai changé `CHEMIN_ADMIN` et ça marche plus | redémarre le serveur (variable lue au démarrage) ; le chemin doit être une seule tranche, ex. `/gestion` |
 | Écran de connexion qui ne se passe pas bien | le code source de la page doit contenir `id="adm-root"` (sinon c'est un ancien cache : Maj+F5) |
 | Import d'URL sans photo | SHEIN/Temu bloquent la lecture : téléverse la photo depuis ton téléphone |
 | Une photo distante ne s'affiche pas chez le client | elle doit être rapatriée (bouton *Ajouter* du champ URL) — le site ne hotlinke pas |

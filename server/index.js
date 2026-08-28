@@ -70,24 +70,21 @@ app.use('/uploads', express.static(UPLOADS_DIR, { maxAge: '7d', immutable: true,
 app.use('/media', express.static(path.join(PUBLIC_DIR, 'media'), { maxAge: '1d' }));
 
 /* ------------- Frontend — espace vendeur (page privée, URL au choix) -------------
-   Le back-office est une page à part, servie sur CHEMIN_ADMIN (défaut
-   /gestion-fatou). Rien, dans les fichiers destinés au public, n'en contient
-   l'URL : ni lien, ni script, ni commentaire. Les fichiers vivent hors de
-   public/ et ne sont accessibles que par les trois routes ci-dessous, plus
-   l'identifiant et le mot de passe. */
+   Le back-office est une page à part, servie sur CHEMIN_ADMIN (défaut /admin).
+   Rien, dans les fichiers destinés au public, ne mène à cette URL : ni lien,
+   ni menu, ni route interne, et le code du back-office n'est jamais chargé dans
+   le navigateur d'une cliente. Les fichiers vivent hors de public/ : ils ne
+   sont accessibles que par les trois routes ci-dessous — plus l'identifiant et
+   le mot de passe. */
 const CHEMIN_ADMIN = (() => {
-  const brut = (process.env.CHEMIN_ADMIN || '/gestion-fatou').trim().replace(/\/+$/, '');
+  const brut = (process.env.CHEMIN_ADMIN || '/admin').trim().replace(/\/+$/, '');
   const net = brut.startsWith('/') ? brut : `/${brut}`;
   if (!/^\/[a-z0-9][a-z0-9_-]{0,39}$/i.test(net) || net === '/api' || net === '/uploads' || net === '/media' || net === '/css' || net === '/js') {
-    console.warn(`[admin] CHEMIN_ADMIN « ${process.env.CHEMIN_ADMIN} » refusé (lettres, chiffres, - et _, ex. /gestion-fatou) → /gestion-fatou utilisé.`);
-    return '/gestion-fatou';
+    console.warn(`[admin] CHEMIN_ADMIN « ${process.env.CHEMIN_ADMIN} » refusé (une seule tranche : lettres, chiffres, - et _, ex. /admin) → /admin utilisé.`);
+    return '/admin';
   }
   return net;
 })();
-/* Les devinettes évidentes (« /admin ») ne retombent même pas sur la boutique :
-   réponse neutre, sans confirmer ni démentir quoi que ce soit. */
-if (CHEMIN_ADMIN !== '/admin') app.use(/^\/admin(\/|$)/i, (req, res) => res.status(404).type('text/plain').send('Page introuvable.'));
-
 /* Le HTML est un gabarit : __BASE__ prend la valeur de CHEMIN_ADMIN à chaque
    requête, le fichier sur disque ne mentionne donc jamais l'URL réelle. */
 const PAGE_ADMIN = path.join(ADMIN_UI_DIR, 'index.html');
@@ -151,7 +148,7 @@ console.log(
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`✔ boutique en ligne sur le port ${PORT}`);
-  console.log(`🔒 espace vendeur : http://localhost:${PORT}${CHEMIN_ADMIN} — lien privé, rien n'y mène depuis la boutique`);
+  console.log(`🔒 espace vendeur : http://localhost:${PORT}${CHEMIN_ADMIN} — aucun lien depuis la boutique, à ouvrir directement`);
 });
 
 for (const sig of ['SIGTERM', 'SIGINT']) {

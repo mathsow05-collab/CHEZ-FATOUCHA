@@ -23,7 +23,6 @@ const env = {
   DATA_DIR: path.join(DATA, 'data'),
   UPLOADS_DIR: path.join(DATA, 'uploads'),
   JWT_SECRET: 'secret-de-test',
-  CHEMIN_ADMIN: '/gestion-fatou',
   ADMIN1_USERNAME: 'admin',
   ADMIN1_PASSWORD: 'test12345',
   ADMIN2_USERNAME: '',
@@ -243,43 +242,46 @@ const J = async (method, url, body, token) => {
     check('CSP limite les scripts au même origine', /script-src 'self'/.test('' + page.headers.get('content-security-policy')));
     check('route API inconnue → 404 JSON', (await J('GET', '/api/nopique')).status === 404);
 
-    console.log('— Espace vendeur : page privée, invisible côté cliente —');
-    const CHEMIN = '/gestion-fatou';
+    console.log('— Espace vendeur : sa propre page, invisible côté cliente —');
+    const CHEMIN = '/admin';
     const rAdm = await fetch(BASE + CHEMIN);
     const hAdm = await rAdm.text();
     check('la page du back-office est servie sur le chemin choisi', rAdm.status === 200 && /id="adm-root"/.test(hAdm) && !/id="app"/.test(hAdm));
     check('elle affiche l’écran de connexion, pas le catalogue', /Espace vendeur/.test(hAdm) && !/Ajouter au panier/.test(hAdm));
-    check('le gabarit est bien rempli (__BASE__ → /gestion-fatou)', hAdm.includes(CHEMIN + '/admin.js') && hAdm.includes(CHEMIN + '/admin.css') && !/__BASE__/.test(hAdm));
+    check('le gabarit est bien rempli (__BASE__ → /admin)', hAdm.includes(CHEMIN + '/admin.js') && hAdm.includes(CHEMIN + '/admin.css') && !/__BASE__/.test(hAdm));
     check('le slash final sert la même page', /id="adm-root"/.test(await (await fetch(BASE + CHEMIN + '/')).text()));
     check('le JS et le CSS du back-office sont accessibles sous ce chemin',
       /TOKEN_KEY/.test(await (await fetch(BASE + CHEMIN + '/admin.js')).text()) && /adm-login/.test(await (await fetch(BASE + CHEMIN + '/admin.css')).text()));
     check('page non indexable (meta + en-tête)', /noindex/.test(hAdm) && /noindex/.test('' + rAdm.headers.get('x-robots-tag')));
     check('page jamais mise en cache', /no-store/.test('' + rAdm.headers.get('cache-control')));
+    /* Hors des trois routes /admin, /admin/admin.js, /admin/admin.css : les
+       fichiers du back-office doivent être injoignables (404, et surtout aucun
+       fichier de l'admin dans public/). */
     const portes = [];
-    for (const u of ['/admin', '/admin/', '/admin/admin.js', '/admin/index.html', '/admin/admin.css', '/css/admin.css', '/js/admin.js', '/admin-ui/index.html', '/admin-ui/admin.js', '/admin-ui/admin.css']) {
+    for (const u of ['/css/admin.css', '/js/admin.js', '/admin-ui/index.html', '/admin-ui/admin.js', '/admin-ui/admin.css', '/admin/admin.js.map', '/admin/index.html']) {
       const r = await fetch(BASE + u);
       const corps = await r.text();
-      /* une URL de back-office ne doit JAMAIS répondre : ni le fichier (404),
-         ni le HTML du site qui le contiendrait (fallback SPA) */
-      if (r.status !== 404 || /adm-root|adm-login|TOKEN_KEY|adm-top/.test(corps)) portes.push(`${u}→${r.status}`);
+      if (/adm-root|adm-login|adm-top|TOKEN_KEY/.test(corps)) portes.push(`${u}→${r.status} (contenu du back-office servi !)`);
+      else if (u.startsWith('/admin-ui') && r.status !== 404) portes.push(`${u}→${r.status} (devrait être un 404)`);
     }
-    check('aucune URL voisine ou ancienne ne sert le back-office', portes.length === 0, portes.join(' '));
-    check('les fichiers hors de public/ sont inaccessibles par URL', (await fetch(BASE + '/admin-ui/admin.js')).status === 404);
+    check('aucun fichier du back-office n’est accessible hors de ses trois routes', portes.length === 0, portes.join(' '));
     const hIdx = await (await fetch(BASE + '/')).text();
     check('page d’accueil : aucun mot « admin »', !/admin/i.test(hIdx));
     const jsApp = await (await fetch(BASE + '/js/app.js')).text();
     const jsApi = await (await fetch(BASE + '/js/api.js')).text();
     const cssPub = await (await fetch(BASE + '/css/style.css')).text();
     check('boutique : aucun lien ni texte « Espace vendeur »', !/>\s*Espace vendeur\s*</.test(jsApp) && !/href="#\/admin"/.test(jsApp));
+    check('boutique : aucune chaîne ne donne l’URL /admin à une cliente', !/["'`]\/admin/.test(jsApp + jsApi + hIdx));
     check('boutique : le code du back-office n’est jamais chargé', !/window\.Admin|\/js\/admin\.js/.test(jsApp));
-    check('thème : la palette féminine est dans la feuille de style', /--rose:\s*#c2426f/.test(cssPub));
-    check('thème : plus aucune couleur du vieux thème sombre', !/--bg:\s*#12100f/.test(cssPub));
+    check('thème : la palette féminine est dans la feuille de style', /--rose:\s*#d9558a/.test(cssPub) && /--paper:\s*#fdf2f6/.test(cssPub));
+    check('thème : plus aucune couleur du vieux thème sombre', !/--bg:\s*#12100f/.test(cssPub) && !/#6c2b4b/.test(cssPub));
+    check('thème : hero et en-tête passent en clair (plus de bloc sombre)', /radial-gradient\(130% 150% at 0% 0%, #fff5f9/.test(cssPub) && /rgba\(255, 252, 253, \.86\)/.test(cssPub));
     check('thème : les styles du back-office ne sont plus servis à la boutique', !/\.adm-top|\.tbl \{/.test(cssPub));
     const fuites = [];
     for (const [u, t] of [['/', hIdx], ['/js/app.js', jsApp], ['/js/api.js', jsApi], ['/css/style.css', cssPub]]) {
-      if (/gestion-fatou|adm-root|adm-tabs|CHEMIN_ADMIN/.test(t)) fuites.push(u);
+      if (/adm-root|adm-tabs|adm-login|CHEMIN_ADMIN|TOKEN_KEY/.test(t)) fuites.push(u);
     }
-    check('l’URL privée n’apparaît dans AUCUN fichier reçu par la cliente', fuites.length === 0, fuites.join(' '));
+    check('le code du back-office n’apparaît dans AUCUN fichier reçu par la cliente', fuites.length === 0, fuites.join(' '));
     const rPerdu = await fetch(BASE + '/css/pas-la.css');
     check('asset manquant → 404 (et non la page du site)', rPerdu.status === 404 && !/id="app"/.test(await rPerdu.text()));
         check('export CSV commandes', (await fetch(BASE + '/api/admin/commandes-export', { headers: { Authorization: 'Bearer ' + tok } })).headers.get('content-type')?.includes('csv'));
