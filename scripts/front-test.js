@@ -87,6 +87,8 @@ const J = async (method, url, body, token) => {
     await until(() => w.document.querySelectorAll('.card').length > 0, { label: 'cartes produits' });
     const d = w.document;
     check('hero + nom de la boutique affichés', /CHEZ FATOUCHA/.test(d.body.textContent));
+    check('hero éditorial : sur-titre, visuel et monogramme « CF »', !!d.querySelector('.hero .sur') && !!d.querySelector('.hero .visuel img') && /^[A-Z]{2}$/.test(d.querySelector('.brand .logo').textContent.trim()), JSON.stringify(d.querySelector('.brand .logo')?.textContent));
+    check('bandeau du haut sans emojis (registre sobre)', !/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(d.querySelector('.marquee').textContent), d.querySelector('.marquee').textContent.trim().slice(0, 40));
     check('cartes produits rendues (= nb en base)', d.querySelectorAll('.card').length === (await (await fetch(BASE + '/api/produits')).json()).length, `(${d.querySelectorAll('.card').length})`);
     check('prix en FCFA sur les cartes', /\d{1,3}\s?\d{3}\s?F/.test(d.querySelector('.card .price').textContent), d.querySelector('.card .price')?.textContent);
     check('délai estimé sur la carte', /~\d+ jour/.test(d.querySelector('.card .mini').textContent), d.querySelector('.card .mini')?.textContent);

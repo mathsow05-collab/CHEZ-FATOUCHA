@@ -8,6 +8,7 @@ const TOKEN_KEY = 'fatoucha_admin_token';
 const VUES = ['dash', 'commandes', 'produits', 'zones', 'reglages'];
 const S = { vue: 'dash', pret: false, commandes: { filtre: 'toutes', q: '' }, produits: { q: '', etat: 'tous' } };
 const vueDuHash = () => (location.hash || '').replace(/^#\/?/, '').split('?')[0];
+const monogramme = () => (A.cfg?.nom_boutique || 'CHEZ FATOUCHA').replace(/[^\p{L}\s]/gu, ' ').split(/\s+/).filter(Boolean).slice(0, 2).map((m) => m[0]).join('').toUpperCase() || 'CF';
 let A = null; // conteneur racine (#adm-root)
 
 /* --------- helpers --------- */
@@ -50,7 +51,7 @@ function coquille() {
   return `
   <div class="adm-shell">
     <header class="adm-top"><div class="in">
-      <span class="brand"><span class="logo">🛍️</span><span><b>${esc(A.cfg?.nom_boutique || 'CHEZ FATOUCHA')}</b><small>Espace vendeur — privé</small></span></span>
+      <span class="brand"><span class="logo">${esc(monogramme())}</span><span><b>${esc(A.cfg?.nom_boutique || 'CHEZ FATOUCHA')}</b><small>Espace vendeur — privé</small></span></span>
       <nav class="adm-tabs">${tabs.map(([k, l]) => `<a href="#${k}" class="${S.vue === k ? 'on' : ''}" data-tab="${k}">${l}</a>`).join('')}</nav>
       <div class="who">
         <span class="private-flag">🔒 ${esc(A.who?.admin?.display_name || A.who?.admin?.username || '')}</span>

@@ -273,9 +273,13 @@ const J = async (method, url, body, token) => {
     check('boutique : aucun lien ni texte « Espace vendeur »', !/>\s*Espace vendeur\s*</.test(jsApp) && !/href="#\/admin"/.test(jsApp));
     check('boutique : aucune chaîne ne donne l’URL /admin à une cliente', !/["'`]\/admin/.test(jsApp + jsApi + hIdx));
     check('boutique : le code du back-office n’est jamais chargé', !/window\.Admin|\/js\/admin\.js/.test(jsApp));
-    check('thème : la palette féminine est dans la feuille de style', /--rose:\s*#d9558a/.test(cssPub) && /--paper:\s*#fdf2f6/.test(cssPub));
-    check('thème : plus aucune couleur du vieux thème sombre', !/--bg:\s*#12100f/.test(cssPub) && !/#6c2b4b/.test(cssPub));
-    check('thème : hero et en-tête passent en clair (plus de bloc sombre)', /radial-gradient\(130% 150% at 0% 0%, #fff5f9/.test(cssPub) && /rgba\(255, 252, 253, \.86\)/.test(cssPub));
+    check('thème « Prestige » : ivoire + encre aubergine + or champagne', /--ivoire:\s*#f7f3ec/.test(cssPub) && /--encre:\s*#241a22/.test(cssPub) && /--or:\s*#b8912f/.test(cssPub) && /--bordeaux:\s*#6d1f46/.test(cssPub));
+    check('thème : alias conservés (--rose, --paper…) pour les composants', /--rose:\s*var\(--bordeaux\)/.test(cssPub) && /--paper:\s*var\(--ivoire\)/.test(cssPub));
+    check('thème : plus aucun rose bonbon du passé', !['#d9558a', '#fdf2f6', '#fbdbe7', '#c8397a', '#6c2b4b'].some((c) => cssPub.includes(c)));
+    check('thème : hero sombre à filet or, en-tête ivoire translucide', /radial-gradient\(120% 140% at 8% 0%, #3b2434/.test(cssPub) && /rgba\(184, 145, 47, \.3\)/.test(cssPub) && /rgba\(247, 243, 236, \.92\)/.test(cssPub));
+    check('thème : cartes éditoriales (pas d’encadrement, zoom photo au survol)', /\.card \{ background: transparent; border: 0/.test(cssPub) && /\.card:hover \.ph img \{ transform: scale\(1\.035\) \}/.test(cssPub));
+    check('thème : typographie — titres serif, micro-labels en capitales espacées', /--serif: "Hoefler Text", Didot/.test(cssPub) && /text-transform: uppercase; letter-spacing: \.12em/.test(cssPub));
+    check('thème : plus de gros arrondis « app mignonne »', !/border-radius: 999px;[^}]*\.btn/.test(cssPub) && /--r: 10px/.test(cssPub) && /--r-lg: 16px/.test(cssPub));
     check('thème : les styles du back-office ne sont plus servis à la boutique', !/\.adm-top|\.tbl \{/.test(cssPub));
     const fuites = [];
     for (const [u, t] of [['/', hIdx], ['/js/app.js', jsApp], ['/js/api.js', jsApi], ['/css/style.css', cssPub]]) {
@@ -284,7 +288,11 @@ const J = async (method, url, body, token) => {
     check('le code du back-office n’apparaît dans AUCUN fichier reçu par la cliente', fuites.length === 0, fuites.join(' '));
     const rPerdu = await fetch(BASE + '/css/pas-la.css');
     check('asset manquant → 404 (et non la page du site)', rPerdu.status === 404 && !/id="app"/.test(await rPerdu.text()));
-        check('export CSV commandes', (await fetch(BASE + '/api/admin/commandes-export', { headers: { Authorization: 'Bearer ' + tok } })).headers.get('content-type')?.includes('csv'));
+        const jpgs = (await J('GET', '/api/produits')).data.map((x) => x.image || (x.images && x.images[0] && x.images[0].url));
+    check('catalogue de démo : 8 vraies photos (aucune tuile dégradée)', jpgs.filter((u) => /\.jpg$/.test(u || '')).length === 8, jpgs.join(' '));
+    check('visuel du hero présent et servi', (await fetch(BASE + '/media/demo/lookbook.jpg')).status === 200);
+    check('favicon monogramme assorti au thème', /CF/.test(await (await fetch(BASE + '/media/favicon.svg')).text()));
+    check('export CSV commandes', (await fetch(BASE + '/api/admin/commandes-export', { headers: { Authorization: 'Bearer ' + tok } })).headers.get('content-type')?.includes('csv'));
   } catch (e) {
     ko++;
     console.error('\n✖ exception :', e.message, '\n--- logs serveur ---\n' + logs.slice(-2500));

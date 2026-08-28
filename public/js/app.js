@@ -15,6 +15,8 @@ const el = (html) => {
 };
 const money = fcfa;
 const hashPath = () => (location.hash || '#/').replace(/^#/, '');
+/* Monogramme de la boutique (deux initiales) — plus « maison de mode » qu'un emoji. */
+const monogramme = () => (Shop.cfg?.nom_boutique || 'CHEZ FATOUCHA').replace(/[^\p{L}\s]/gu, ' ').split(/\s+/).filter(Boolean).slice(0, 2).map((m) => m[0]).join('').toUpperCase() || 'CF';
 const go = (h) => { location.hash = h; };
 const img = (p) => p.image || (p.images && p.images[0]?.url) || '/media/demo/robe-boheme.svg';
 
@@ -23,8 +25,8 @@ function topbar(active = '') {
   <header class="top">
     <div class="wrap bar">
       <a class="brand" href="#/">
-        <span class="logo">🛍️</span>
-        <span><b>${esc(Shop.cfg?.nom_boutique || 'CHEZ FATOUCHA')}</b><small>DAKAR · LIVRAISON PARTOUT</small></span>
+        <span class="logo">${esc(monogramme())}</span>
+        <span><b>${esc(Shop.cfg?.nom_boutique || 'CHEZ FATOUCHA')}</b><small>Dakar · Livraison & retrait</small></span>
       </a>
       <nav class="main">
         <a href="#/" class="${active === 'boutique' ? 'on' : ''}">Boutique</a>
@@ -37,10 +39,10 @@ function topbar(active = '') {
     </div>
   </header>
   <div class="marquee"><div class="wrap">
-    <span>🚚 Livraison <b>Dakar 1 000 F</b> · régions dès <b>3 000 F</b></span>
-    <span>🏪 Retrait boutique <b>gratuit</b></span>
-    <span>📱 Paiement <b>Wave</b> / <b>Orange Money</b></span>
-    <span>🆓 Livraison offerte dès <b>${money(Shop.cfg?.livraison_gratuite_a_partir || 0)}</b> d’achat</span>
+    <span>Livraison <b>Dakar dès 1 000 F</b> · régions dès <b>3 000 F</b></span>
+    <span>Retrait boutique <b>offert</b></span>
+    <span>Paiement <b>Wave</b> & <b>Orange Money</b></span>
+    <span>Livraison offerte dès <b>${money(Shop.cfg?.livraison_gratuite_a_partir || 0)}</b></span>
   </div></div>`;
 }
 
@@ -86,7 +88,7 @@ function card(p) {
       <div class="t">${esc(p.titre)}</div>
       <div class="price">${money(p.prix)}${p.prix_barre ? `<s>${money(p.prix_barre)}</s>` : ''}</div>
       <div class="foot">
-        <span class="mini">🚚 ~${p.delai_jours} ${jplural(p.delai_jours)}</span>
+        <span class="mini">~${p.delai_jours} ${jplural(p.delai_jours)} · Dakar</span>
         <button class="add-mini" data-add="${p.id}" title="Ajouter au panier" ${p.en_rupture ? 'disabled' : ''}>+</button>
       </div>
     </div>
@@ -104,6 +106,8 @@ async function vueBoutique() {
   return `
   ${topbar('boutique')}
   <section class="hero"><div class="wrap"><div class="inner">
+    <div class="txt">
+    <span class="sur">Sélection &amp; pièces choisies · Dakar</span>
     <h1>La mode qui t’aime, <em>livrée à ta porte</em>.</h1>
     <p>Robes, ensembles, sacs, chaussures, parfums… choisis ta taille et ta quantité, paie par Wave ou Orange Money. On livre à Dakar et dans toutes les régions — ou tu viens retirer à la boutique.</p>
     <div class="cta">
@@ -116,6 +120,12 @@ async function vueBoutique() {
       <div><b>1 000 F</b> frais dès le quartier d’à côté</div>
       <div><b>Wave / OM</b> paiement direct</div>
     </div>
+    </div>
+    <figure class="visuel">
+      <img src="/media/demo/lookbook.jpg" alt="Silhouette de la sélection Chez Fatoucha" loading="eager"
+           onerror="this.closest('.visuel').style.display='none'" />
+      <figcaption>La sélection Fatoucha</figcaption>
+    </figure>
   </div></div></section>
 
   <section class="blk"><div class="wrap">

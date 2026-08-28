@@ -16,8 +16,8 @@ pour valider son panier** — Wave ou Orange Money.
 npm install
 cp .env.example .env          # optionnel en dev : des valeurs par défaut existent
 npm run check:css             # contrôle du thème (syntaxe, variables, cloisonnement boutique/back-office)
-npm run smoke                 # 90 vérifications API + pages servies (boutique, commande, paiement, admin)
-npm run test:front            # 53 vérifications du rendu réel (jsdom) : parcours client + espace vendeur
+npm run smoke                 # 97 vérifications API + pages servies (boutique, commande, paiement, admin)
+npm run test:front            # 55 vérifications du rendu réel (jsdom) : parcours client + espace vendeur
 npm start                     # http://localhost:3000
 ```
 
@@ -71,15 +71,24 @@ ne donne aucun accès.)
 | 🚚 Zones & délais | tarif et délai par quartier/région, activation d'une zone, tout est modifiable |
 | ⚙️ Réglages | nom, slogan, contacts, adresse/horaires de retrait, **numéros Wave / Orange Money**, livraison offerte à partir de X, expiration des commandes impayées, clés CinetPay, mot de passe |
 
-### Le thème (boutique et admin)
+### Le thème — « Prestige » (boutique et admin)
 
-Rose poudré, prune, lilas, doré, gros arrondis : tout part des variables en haut de
-`public/css/style.css` — `--ink: #3a1a30` (prune, jamais noir), `--paper: #fdf2f6`,
-`--rose: #d9558a`, `--rose-2: #b23267`, `--rose-soft`, `--blush`, `--lilac`, `--gold`,
-`--line`, `--r: 20px` / `--r-lg: 28px`, `--serif` pour les titres. Change une ligne, tout le site suit. La page du back-office
-(`admin-ui/admin.css`) reprend exactement les mêmes variables — elle est assortie à la
-boutique sans la resservir. Les règles propres à l'admin (tableaux, KPI, grille de stock,
-glisser-déposer) ont quitté `style.css` : la cliente ne télécharge pas le CSS du back-office.
+Registre maison de mode : **ivoire chaud** `#f7f3ec`, **encre aubergine** `#241a22` (jamais de noir
+pur), **bordeaux** `#6d1f46` en accent, **or champagne** `#b8912f` en filets, **titres en serif**
+(Hoefler Text / Didot), capitales espacées (`.12–.2em`) sur les micro-labels, rayons serrés
+(`--r: 10px`, `--r-lg: 16px`), hairlines au lieu d'encadrements, cartes produit sans bordure avec
+zoom photo au survol, hero sombre à filet or + visuel éditorial, favicon en monogramme « CF ».
+
+Tout part des variables en haut de `public/css/style.css` : `--ivoire`, `--nacre`, `--encre`,
+`--bordeaux`, `--or`, `--poussiere`, `--filet`, `--serif`. **Change une ligne, tout le site suit.**
+Les noms historiques (`--rose`, `--paper`, `--ink`, `--gold`, `--line`…) restent valables : ce sont
+des alias, donc aucun composant n'est cassé si tu les croises dans une règle.
+
+La page du back-office (`admin-ui/admin.css`) reprend exactement les mêmes variables — assortie,
+sans rien resservir. Les règles propres à l'admin (tableaux, KPI, grille de stock, glisser-déposer)
+ont quitté `style.css` : la cliente ne télécharge pas le CSS du back-office. `npm run check:css`
+verrouille les deux : syntaxe, variables réellement définies par les feuilles chargées,
+cloisonnement, aucun sélecteur mort. Les contrastes texte/fond sont au niveau AA (4,6:1 à 15:1).
 
 ### Règles métier codées
 - **Stock réservé dès la commande** (décrémenté), **remis en rayon** si la commande est annulée.
@@ -229,11 +238,11 @@ dans `render.yaml`). Alternative gratuite : sauvegarder régulièrement `data/fa
 ## 9. Tests
 
 ```bash
-npm run check:css    # 8 checks : thème (palette féminine), variables, cloisonnement CSS
-npm run smoke        # 90 checks : catalogue, commande, stock, paiement, admin, zones, sécurité,
+npm run check:css    # 8 checks : thème (palette Prestige), variables, cloisonnement CSS
+npm run smoke        # 97 checks : catalogue, commande, stock, paiement, admin, zones, sécurité,
                      # + « le back-office a sa propre page, ses fichiers sont injoignables
                      #  et rien, côté cliente, n'y mène ou ne les contient »
-npm run test:front   # 53 checks : parcours client réel dans un DOM (jsdom), puis back-office
+npm run test:front   # 55 checks : parcours client réel dans un DOM (jsdom), puis back-office
                      # ouvert sur son chemin privé dans sa propre fenêtre (onglets, produits,
                      # commandes, validation du paiement)
 ```
