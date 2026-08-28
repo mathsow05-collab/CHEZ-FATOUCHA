@@ -1,7 +1,8 @@
 /* ============================================================
    CHEZ FATOUCHA — front client (SPA à hash, sans framework)
    Routes : #/  #/produit/ID  #/panier  #/commande  #/paiement/REF  #/suivi
-   L'espace vendeur n'est PAS ici : c'est une page à part, servie sur /admin.
+   Le back-office est volontairement absent de ce fichier (et de tout ce que le
+   navigateur de la cliente reçoit) : page privée, hors SPA, à son propre lien.
    ============================================================ */
 const root = document.getElementById('app');
 const state = { produits: [], vue: {}, filtreCat: null, q: '', tri: 'recent' };
@@ -575,16 +576,6 @@ async function vueSuivi(ref = '', tel = '') {
 async function render() {
   const path = hashPath();
   const m = (re) => path.match(re);
-
-  /* « Espace vendeur » est devenu une vraie page séparée (/admin). Les vieux
-     favoris #/admin... sont renvoyés là, avec leur onglet ; le code admin
-     n'est jamais chargé ni affiché dans la boutique. */
-  const exAdmin = path.match(/^\/admin(?:\/(\w+))?(?:[?#].*)?$/);
-  if (exAdmin) {
-    root.innerHTML = '<div class="boot"><div class="boot-logo">ESPACE VENDEUR</div><div class="boot-bar"><i></i></div></div>';
-    location.replace('/admin' + (exAdmin[1] ? '#' + exAdmin[1] : ''));
-    return;
-  }
 
   try {
     await Shop.load();

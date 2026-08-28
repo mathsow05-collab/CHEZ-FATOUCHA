@@ -15,24 +15,27 @@ pour valider son panier** — Wave ou Orange Money.
 ```bash
 npm install
 cp .env.example .env          # optionnel en dev : des valeurs par défaut existent
-npm run smoke                 # 87 vérifications API + pages servies (boutique, commande, paiement, admin)
-npm run test:front            # 51 vérifications du rendu réel (jsdom) : parcours client + espace vendeur
+npm run check:css             # contrôle du thème (syntaxe, variables, cloisonnement boutique/back-office)
+npm run smoke                 # 89 vérifications API + pages servies (boutique, commande, paiement, admin)
+npm run test:front            # 53 vérifications du rendu réel (jsdom) : parcours client + espace vendeur
 npm start                     # http://localhost:3000
 ```
 
 | URL | Ce que c'est |
 | --- | --- |
 | `http://localhost:3000/#/` | la boutique côté cliente |
-| `http://localhost:3000/admin` | **l'espace vendeur (admin) — page séparée** |
+| `http://localhost:3000/gestion-fatou` | **l'espace vendeur — page privée, à son propre lien** |
 | `http://localhost:3000/api/health` | sonde de vie (Render l'utilise) |
 
 Compte admin du premier lancement : variables `ADMIN1_USERNAME` / `ADMIN1_PASSWORD`
 (par défaut `admin` / `fatoucha2026` en local — **à changer absolument**).
 
 > L'espace vendeur n'apparaît **nulle part** dans la boutique : aucun lien, aucun bouton,
-> aucun menu. C'est une page à part, à ouvrir (ou à mettre en favori) sous `/admin` —
-> en ligne : `https://<ton-domaine>/admin`. Le code de l'admin n'est jamais chargé
-> ni envoyé au navigateur d'une cliente.
+> aucun menu, et **aucune trace de son URL** dans le HTML, le JS ou le CSS reçus par une
+> cliente. C'est une page à part, à ouvrir (ou à mettre en favori) : en local
+> `http://localhost:3000/gestion-fatou`, en ligne `https://<ton-domaine>/gestion-fatou`.
+> Le chemin se change avec une variable : `CHEMIN_ADMIN=/ton-url` (voir `.env.example`).
+> Taper `/admin` renvoie désormais « Page introuvable ».
 
 ---
 
@@ -50,11 +53,15 @@ Compte admin du premier lancement : variables `ADMIN1_USERNAME` / `ADMIN1_PASSWO
 - **Suivi** : `#/suivi` avec référence + numéro → timeline *reçue → payée → préparation → expédiée → livrée*,
   total, articles, délai estimé, bouton WhatsApp, annulation tant que rien n'est payé.
 
-### Côté admin — `/admin`, page privée à son propre lien
+### Côté admin — `/gestion-fatou`, page privée à son propre lien
 
-Ouverture : tape `/admin` (le vieux `/#/admin` y renvoie automatiquement). Le changement
-d'onglet se fait par hash interne (`/admin#commandes`), donc rien à configurer côté serveur :
-une seule URL à partager, à personne d'autre qu'à toi.
+Le back-office n'est pas une page du site : c'est un petit fichier autonome
+(`admin-ui/`) que le serveur ne sert que sur `CHEMIN_ADMIN` (défaut `/gestion-fatou`).
+Les fichiers sont **hors de `public/`** : aucune URL statique ne peut les attraper.
+Ouverture : ajoute le lien en favori, c'est tout. Le changement d'onglet se fait par hash
+interne (`/gestion-fatou#commandes`), donc rien à configurer côté serveur ni à partager :
+cette URL, tu es la seule à la connaître. (L'API, elle, reste sur `/api/admin/*` : elle est
+derrière jeton de session + mot de passe — une URL connue ne donne donc aucun accès.)
 
 
 | Onglet | Contenu |
@@ -69,8 +76,10 @@ une seule URL à partager, à personne d'autre qu'à toi.
 
 Rose poudré, prune, doré, arrondis : tout part des variables en haut de `public/css/style.css`
 (`--ink`, `--paper`, `--rose`, `--rose-soft`, `--blush`, `--lilac`, `--gold`, `--line`, `--r`,
-`--serif`). Change une ligne, tout le site suit. La page admin (`public/css/admin.css`) reprend
-exactement les mêmes variables — elle est assortie à la boutique sans la resservir.
+`--serif`). Change une ligne, tout le site suit. La page du back-office
+(`admin-ui/admin.css`) reprend exactement les mêmes variables — elle est assortie à la
+boutique sans la resservir. Les règles propres à l'admin (tableaux, KPI, grille de stock,
+glisser-déposer) ont quitté `style.css` : la cliente ne télécharge pas le CSS du back-office.
 
 ### Règles métier codées
 - **Stock réservé dès la commande** (décrémenté), **remis en rayon** si la commande est annulée.
@@ -157,17 +166,22 @@ fatoucha/
 │       └── admin.js     API admin (auth, produits, variantes, upload, commandes, zones, réglages)
 ├── public/            front vanilla, sans build :
 │   ├── index.html     coquille cliente (le routeur à # est dans js/app.js)
-│   ├── admin/         ESPACE VENDEUR = page séparée servie sur /admin (index.html + admin.js)
-│   ├── css/           style.css (thème + boutique) · admin.css (chrome de l'espace vendeur)
+│   ├── css/style.css  thème (variables) + boutique — rien de propre à l'admin
 │   ├── js/            api.js (aides partagées) · app.js (parcours cliente uniquement)
 │   └── media/         visuels de démo, favicon
-├── scripts/           smoke-test.js (API), front-test.js (jsdom), make-demo-images.js
+├── admin-ui/          LE BACK-OFFICE, hors de public/ (invisible par URL statique) :
+│   ├── index.html     gabarit (le serveur y injecte CHEMIN_ADMIN) — login plein écran
+│   ├── admin.js       tableau de bord, commandes, produits, zones, réglages
+│   └── admin.css      chrome assorti + règles admin extraites du CSS public
+├── scripts/           smoke-test.js (API + pages), front-test.js (jsdom),
+│                      check-css.js (thème), make-demo-images.js (visuels de démo)
 ├── data/              base SQLite (créée au 1er lancement, non commitée)
 ├── uploads/produits/  photos téléversées (non commitées)
 ├── .gitignore  ├── .env.example  ├── render.yaml (Blueprint, à la racine)  └── Dockerfile
 ```
 
-Dépendances : `express`, `better-sqlite3`, `multer` (+ `jsdom` en dev pour le test de rendu). Pas de build : le front est servi tel quel.
+Dépendances : `express`, `better-sqlite3`, `multer` — et rien d'autre en production
+(`jsdom` et `postcss` en dev, pour les tests uniquement). Pas de build : le front est servi tel quel.
 
 ---
 
@@ -179,6 +193,7 @@ Dépendances : `express`, `better-sqlite3`, `multer` (+ `jsdom` en dev pour le t
 2. Render → **New + → Blueprint** → sélectionne `mathsow05-collab/CHEZ-FATOUCHA` →
    Render affiche **1 nouveau service `chez-fatoucha`**.
 3. Renseigne les variables marquées `sync: false` : `ADMIN1_USERNAME`, `ADMIN1_PASSWORD`,
+   éventuellement `CHEMIN_ADMIN` (URL du back-office — sinon `/gestion-fatou`),
    (optionnel) `CINETPAY_SITE_ID`, `CINETPAY_API_KEY`. `JWT_SECRET` est généré tout seul.
 4. **Create Blueprint** → build → l'URL est du genre `https://chez-fatoucha.onrender.com`.
 5. Ensuite, chaque `git push` sur `main` redéploie automatiquement.
@@ -214,10 +229,13 @@ dans `render.yaml`). Alternative gratuite : sauvegarder régulièrement `data/fa
 ## 9. Tests
 
 ```bash
-npm run smoke        # 87 checks : catalogue, commande, stock, paiement, admin, zones, sécurité,
-                     # + « la page /admin est bien séparée et la cliente ne voit rien »
-npm run test:front   # 51 checks : parcours client réel dans un DOM (jsdom), puis espace vendeur
-                     # ouvert sur /admin dans sa propre fenêtre (produits, commandes, paiement)
+npm run check:css    # 8 checks : thème (palette féminine), variables, cloisonnement CSS
+npm run smoke        # 89 checks : catalogue, commande, stock, paiement, admin, zones, sécurité,
+                     # + « la page privée est bien séparée, introuvable par URL, et aucune
+                     #  trace de son chemin dans ce que reçoit la cliente »
+npm run test:front   # 53 checks : parcours client réel dans un DOM (jsdom), puis back-office
+                     # ouvert sur son chemin privé dans sa propre fenêtre (onglets, produits,
+                     # commandes, validation du paiement)
 ```
 
 ## 10. Dépannage
@@ -229,8 +247,9 @@ npm run test:front   # 51 checks : parcours client réel dans un DOM (jsdom), pu
 | Render renvoie 404 sur `/api/health` | mauvais Root Directory (monorepo) ou service lancé sur le mauvais dépôt |
 | Commandes perdues après un redéploiement | plan gratuit sans disque → voir §7 |
 | « Le prestataire de paiement ne répond pas » | pas de clés CinetPay → mode manuel utilisé (normal) ; ou clés invalides → vérifier Site ID/API key |
-| Je ne vois pas l'espace admin, normal ? | Oui côté cliente : il n'a aucun lien. Ouvre `ton-domaine/admin` (ex. `https://chez-fatoucha.onrender.com/admin`) et connecte-toi |
-| `/admin` affiche la boutique | ancien code servi : vide le cache (Maj+F5) — la page admin doit finir par `id="adm-root"` dans le code source |
+| Je ne vois pas l'espace admin, normal ? | Oui côté cliente : il n'a aucun lien ni aucune trace. Ouvre ton favori : `https://<ton-domaine>/gestion-fatou` (chemin = `CHEMIN_ADMIN`) |
+| `/admin` → « Page introuvable » | voulu : le back-office n'est plus là. Si tu as changé `CHEMIN_ADMIN`, c'est la nouvelle URL ; redémarre le serveur après modification de `.env` |
+| Écran de connexion qui ne se passe pas bien | le code source de la page doit contenir `id="adm-root"` (sinon c'est un ancien cache : Maj+F5) |
 | Import d'URL sans photo | SHEIN/Temu bloquent la lecture : téléverse la photo depuis ton téléphone |
 | Une photo distante ne s'affiche pas chez le client | elle doit être rapatriée (bouton *Ajouter* du champ URL) — le site ne hotlinke pas |
 | Besoin de repartir de zéro | supprimer `data/fatoucha.db` et relancer (les réglages/zones/produits de démo sont re-seed) |

@@ -11,7 +11,7 @@ if (!process.env.JWT_SECRET) {
 
 const { db, getSetting } = require('./db');
 const { seed } = require('./seed');
-const { PUBLIC_DIR, UPLOADS_DIR, DATA_DIR } = require('./paths');
+const { PUBLIC_DIR, UPLOADS_DIR, DATA_DIR, ADMIN_UI_DIR } = require('./paths');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -69,17 +69,45 @@ app.use('/uploads', express.static(UPLOADS_DIR, { maxAge: '7d', immutable: true,
 /* Visuels de démonstration livrés avec le code. */
 app.use('/media', express.static(path.join(PUBLIC_DIR, 'media'), { maxAge: '1d' }));
 
-/* ---------------- Frontend — espace vendeur (page séparée) ----------------
-   /admin sert public/admin/index.html, une page à part : la boutique n'en
-   parle nulle part (ni lien, ni menu) et le code admin n'est jamais chargé
-   côté cliente. L'URL reste protégée par identifiant + mot de passe. */
-const PAGE_ADMIN = path.join(PUBLIC_DIR, 'admin', 'index.html');
-app.get(['/admin', '/admin/'], (req, res, next) => {
-  if (!fs.existsSync(PAGE_ADMIN)) return res.status(503).send('Page admin absente : public/admin/index.html introuvable.');
-  res.setHeader('Cache-Control', 'no-store');
-  res.setHeader('X-Robots-Tag', 'noindex, nofollow'); /* hors des moteurs de recherche */
-  return res.sendFile(PAGE_ADMIN);
-});
+/* ------------- Frontend — espace vendeur (page privée, URL au choix) -------------
+   Le back-office est une page à part, servie sur CHEMIN_ADMIN (défaut
+   /gestion-fatou). Rien, dans les fichiers destinés au public, n'en contient
+   l'URL : ni lien, ni script, ni commentaire. Les fichiers vivent hors de
+   public/ et ne sont accessibles que par les trois routes ci-dessous, plus
+   l'identifiant et le mot de passe. */
+const CHEMIN_ADMIN = (() => {
+  const brut = (process.env.CHEMIN_ADMIN || '/gestion-fatou').trim().replace(/\/+$/, '');
+  const net = brut.startsWith('/') ? brut : `/${brut}`;
+  if (!/^\/[a-z0-9][a-z0-9_-]{0,39}$/i.test(net) || net === '/api' || net === '/uploads' || net === '/media' || net === '/css' || net === '/js') {
+    console.warn(`[admin] CHEMIN_ADMIN « ${process.env.CHEMIN_ADMIN} » refusé (lettres, chiffres, - et _, ex. /gestion-fatou) → /gestion-fatou utilisé.`);
+    return '/gestion-fatou';
+  }
+  return net;
+})();
+/* Les devinettes évidentes (« /admin ») ne retombent même pas sur la boutique :
+   réponse neutre, sans confirmer ni démentir quoi que ce soit. */
+if (CHEMIN_ADMIN !== '/admin') app.use(/^\/admin(\/|$)/i, (req, res) => res.status(404).type('text/plain').send('Page introuvable.'));
+
+/* Le HTML est un gabarit : __BASE__ prend la valeur de CHEMIN_ADMIN à chaque
+   requête, le fichier sur disque ne mentionne donc jamais l'URL réelle. */
+const PAGE_ADMIN = path.join(ADMIN_UI_DIR, 'index.html');
+const ENVOI_ADMIN = {
+  '': { fichier: 'index.html', type: 'text/html; charset=utf-8' },
+  'admin.css': { fichier: 'admin.css', type: 'text/css; charset=utf-8' },
+  'admin.js': { fichier: 'admin.js', type: 'text/javascript; charset=utf-8' },
+};
+for (const [suffixe, meta] of Object.entries(ENVOI_ADMIN)) {
+  const url = suffixe ? `${CHEMIN_ADMIN}/${suffixe}` : [CHEMIN_ADMIN, `${CHEMIN_ADMIN}/`];
+  app.get(url, (req, res) => {
+    const fichier = path.join(ADMIN_UI_DIR, meta.fichier);
+    if (!fs.existsSync(fichier)) return res.status(503).send(`Fichier du back-office absent : admin-ui/${meta.fichier}`);
+    res.setHeader('Content-Type', meta.type);
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow'); /* hors des moteurs de recherche */
+    if (suffixe) return res.sendFile(fichier);
+    return res.send(fs.readFileSync(fichier, 'utf8').split('__BASE__').join(CHEMIN_ADMIN));
+  });
+}
 
 /* ------------------------- Frontend (SPA à hash) ------------------------- */
 app.use(express.static(PUBLIC_DIR, { extensions: ['html'], index: 'index.html' }));
@@ -88,7 +116,7 @@ app.use((req, res, next) => {
   const p = req.path || '/';
   if (req.method !== 'GET' || p.startsWith('/api/') || p.startsWith('/uploads/') || p.startsWith('/media/')) return next();
   /* une URL qui ressemble à un fichier (asset manquant) doit rester un 404 */
-  if (/\.(js|mjs|css|map|png|jpe?g|gif|svg|webp|ico|json|txt|xml|woff2?|mp4)$/i.test(p)) return next();
+  if (/\.(js|mjs|css|map|png|jpe?g|gif|svg|webp|ico|json|txt|xml|woff2?|mp4|html?)$/i.test(p)) return next();
   const index = path.join(PUBLIC_DIR, 'index.html');
   if (!fs.existsSync(index)) return res.status(503).send('index.html manquant dans public/.');
   return res.sendFile(index);
@@ -111,7 +139,7 @@ app.use((err, req, res, next) => {
 const seeded = seed();
 if (seeded.admins.length) {
   const lignes = ['', '=== CHEZ FATOUCHA — compte admin créé au premier lancement ==='];
-  for (const a of seeded.admins) lignes.push(`  ${a.username} / ${a.password}   →  http://localhost:${PORT}/admin`);
+  for (const a of seeded.admins) lignes.push(`  ${a.username} / ${a.password}   →  http://localhost:${PORT}${CHEMIN_ADMIN}`);
   lignes.push('  ⚠ Change ces identifiants via ADMIN1_USERNAME / ADMIN1_PASSWORD (.env ou Render).');
   console.warn(lignes.join('\n'));
 }
@@ -123,6 +151,7 @@ console.log(
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`✔ boutique en ligne sur le port ${PORT}`);
+  console.log(`🔒 espace vendeur : http://localhost:${PORT}${CHEMIN_ADMIN} — lien privé, rien n'y mène depuis la boutique`);
 });
 
 for (const sig of ['SIGTERM', 'SIGINT']) {

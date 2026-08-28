@@ -15,6 +15,7 @@ RUN npm install --omit=dev --no-audit --no-fund
 
 COPY server server
 COPY public public
+COPY admin-ui admin-ui
 COPY scripts scripts
 
 RUN mkdir -p data uploads/produits && npm run demo:images

@@ -45,7 +45,7 @@ function toast(msg, kind = '') {
   setTimeout(() => el.remove(), 3600);
 }
 
-/* ---------------- Panier (localStorage, partagé avec l'espace admin) ---------------- */
+/* ---------------- Panier (localStorage, relu par le back-office) ---------------- */
 const CART_KEY = 'fatoucha_cart_v1';
 const Cart = {
   read() {

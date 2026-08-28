@@ -23,6 +23,7 @@ const env = {
   DATA_DIR: path.join(DATA, 'data'),
   UPLOADS_DIR: path.join(DATA, 'uploads'),
   JWT_SECRET: 'secret-de-test',
+  CHEMIN_ADMIN: '/gestion-fatou',
   ADMIN1_USERNAME: 'admin',
   ADMIN1_PASSWORD: 'test12345',
   ADMIN2_USERNAME: '',
@@ -242,28 +243,46 @@ const J = async (method, url, body, token) => {
     check('CSP limite les scripts au même origine', /script-src 'self'/.test('' + page.headers.get('content-security-policy')));
     check('route API inconnue → 404 JSON', (await J('GET', '/api/nopique')).status === 404);
 
-    console.log('— Espace vendeur : page séparée, invisible côté cliente —');
-    const rAdm = await fetch(BASE + '/admin');
+    console.log('— Espace vendeur : page privée, invisible côté cliente —');
+    const CHEMIN = '/gestion-fatou';
+    const rAdm = await fetch(BASE + CHEMIN);
     const hAdm = await rAdm.text();
-    check('/admin renvoie la page admin (et non la boutique)', rAdm.status === 200 && /id="adm-root"/.test(hAdm) && !/id="app"/.test(hAdm));
-    check('/admin affiche l’écran de connexion, pas le catalogue', /Espace vendeur/.test(hAdm) && !/Ajouter au panier/.test(hAdm));
-    check('/admin/ (avec slash final) sert la même page', /id="adm-root"/.test(await (await fetch(BASE + '/admin/')).text()));
-    check('/admin n’est pas indexable (noindex)', /noindex/.test(hAdm) && /noindex/.test('' + rAdm.headers.get('x-robots-tag')));
-    check('/admin : réponse non mise en cache', /no-store/.test('' + rAdm.headers.get('cache-control')));
-    check('le script de l’espace vendeur est servi', /TOKEN_KEY/.test(await (await fetch(BASE + '/admin/admin.js')).text()));
-    check('la feuille de style de l’espace vendeur est servie', /--rose/.test(await (await fetch(BASE + '/css/admin.css')).text()));
-    check('l’ancien chemin /js/admin.js n’existe plus', (await fetch(BASE + '/js/admin.js')).status === 404);
+    check('la page du back-office est servie sur le chemin choisi', rAdm.status === 200 && /id="adm-root"/.test(hAdm) && !/id="app"/.test(hAdm));
+    check('elle affiche l’écran de connexion, pas le catalogue', /Espace vendeur/.test(hAdm) && !/Ajouter au panier/.test(hAdm));
+    check('le gabarit est bien rempli (__BASE__ → /gestion-fatou)', hAdm.includes(CHEMIN + '/admin.js') && hAdm.includes(CHEMIN + '/admin.css') && !/__BASE__/.test(hAdm));
+    check('le slash final sert la même page', /id="adm-root"/.test(await (await fetch(BASE + CHEMIN + '/')).text()));
+    check('le JS et le CSS du back-office sont accessibles sous ce chemin',
+      /TOKEN_KEY/.test(await (await fetch(BASE + CHEMIN + '/admin.js')).text()) && /adm-login/.test(await (await fetch(BASE + CHEMIN + '/admin.css')).text()));
+    check('page non indexable (meta + en-tête)', /noindex/.test(hAdm) && /noindex/.test('' + rAdm.headers.get('x-robots-tag')));
+    check('page jamais mise en cache', /no-store/.test('' + rAdm.headers.get('cache-control')));
+    const portes = [];
+    for (const u of ['/admin', '/admin/', '/admin/admin.js', '/admin/index.html', '/admin/admin.css', '/css/admin.css', '/js/admin.js', '/admin-ui/index.html', '/admin-ui/admin.js', '/admin-ui/admin.css']) {
+      const r = await fetch(BASE + u);
+      const corps = await r.text();
+      /* une URL de back-office ne doit JAMAIS répondre : ni le fichier (404),
+         ni le HTML du site qui le contiendrait (fallback SPA) */
+      if (r.status !== 404 || /adm-root|adm-login|TOKEN_KEY|adm-top/.test(corps)) portes.push(`${u}→${r.status}`);
+    }
+    check('aucune URL voisine ou ancienne ne sert le back-office', portes.length === 0, portes.join(' '));
+    check('les fichiers hors de public/ sont inaccessibles par URL', (await fetch(BASE + '/admin-ui/admin.js')).status === 404);
     const hIdx = await (await fetch(BASE + '/')).text();
     check('page d’accueil : aucun mot « admin »', !/admin/i.test(hIdx));
     const jsApp = await (await fetch(BASE + '/js/app.js')).text();
-    check('boutique : plus aucun lien « Espace vendeur » cliquable', !/>\s*Espace vendeur\s*</.test(jsApp) && !/href="#\/admin"/.test(jsApp));
-    check('boutique : le code admin n’est jamais chargé', !/\/js\/admin\.js|window\.Admin/.test(jsApp));
-    check('boutique : #/admin (vieux favori) redirige vers /admin', /location\.replace\('\/admin'/.test(jsApp));
-    check('thème : la palette féminine est dans la feuille de style', /--rose:\s*#c2426f/.test(await (await fetch(BASE + '/css/style.css')).text()));
-    check('thème : plus aucune couleur du vieux thème sombre', !/--bg:\s*#12100f/.test(await (await fetch(BASE + '/css/style.css')).text()));
+    const jsApi = await (await fetch(BASE + '/js/api.js')).text();
+    const cssPub = await (await fetch(BASE + '/css/style.css')).text();
+    check('boutique : aucun lien ni texte « Espace vendeur »', !/>\s*Espace vendeur\s*</.test(jsApp) && !/href="#\/admin"/.test(jsApp));
+    check('boutique : le code du back-office n’est jamais chargé', !/window\.Admin|\/js\/admin\.js/.test(jsApp));
+    check('thème : la palette féminine est dans la feuille de style', /--rose:\s*#c2426f/.test(cssPub));
+    check('thème : plus aucune couleur du vieux thème sombre', !/--bg:\s*#12100f/.test(cssPub));
+    check('thème : les styles du back-office ne sont plus servis à la boutique', !/\.adm-top|\.tbl \{/.test(cssPub));
+    const fuites = [];
+    for (const [u, t] of [['/', hIdx], ['/js/app.js', jsApp], ['/js/api.js', jsApi], ['/css/style.css', cssPub]]) {
+      if (/gestion-fatou|adm-root|adm-tabs|CHEMIN_ADMIN/.test(t)) fuites.push(u);
+    }
+    check('l’URL privée n’apparaît dans AUCUN fichier reçu par la cliente', fuites.length === 0, fuites.join(' '));
     const rPerdu = await fetch(BASE + '/css/pas-la.css');
     check('asset manquant → 404 (et non la page du site)', rPerdu.status === 404 && !/id="app"/.test(await rPerdu.text()));
-    check('export CSV commandes', (await fetch(BASE + '/api/admin/commandes-export', { headers: { Authorization: 'Bearer ' + tok } })).headers.get('content-type')?.includes('csv'));
+        check('export CSV commandes', (await fetch(BASE + '/api/admin/commandes-export', { headers: { Authorization: 'Bearer ' + tok } })).headers.get('content-type')?.includes('csv'));
   } catch (e) {
     ko++;
     console.error('\n✖ exception :', e.message, '\n--- logs serveur ---\n' + logs.slice(-2500));

@@ -4,11 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Espace vendeur — CHEZ FATOUCHA</title>
+  <!-- __BASE__ est remplacé à la volée par le serveur (CHEMIN_ADMIN) : aucun
+       chemin du back-office n'est écrit en dur dans un fichier servi au public. -->
   <meta name="robots" content="noindex, nofollow" />
   <meta name="theme-color" content="#3d1f36" />
   <link rel="icon" href="/media/favicon.svg" />
   <link rel="stylesheet" href="/css/style.css" />
-  <link rel="stylesheet" href="/css/admin.css" />
+  <link rel="stylesheet" href="__BASE__/admin.css" />
 </head>
 <body class="adm">
   <div id="adm-root">
@@ -20,6 +22,6 @@
   </div>
   <div id="toast-root" aria-live="polite"></div>
   <script src="/js/api.js"></script>
-  <script src="/admin/admin.js"></script>
+  <script src="__BASE__/admin.js"></script>
 </body>
 </html>
