@@ -241,6 +241,28 @@ const J = async (method, url, body, token) => {
     check('asset JS servi', asset.status === 200);
     check('CSP limite les scripts au même origine', /script-src 'self'/.test('' + page.headers.get('content-security-policy')));
     check('route API inconnue → 404 JSON', (await J('GET', '/api/nopique')).status === 404);
+
+    console.log('— Espace vendeur : page séparée, invisible côté cliente —');
+    const rAdm = await fetch(BASE + '/admin');
+    const hAdm = await rAdm.text();
+    check('/admin renvoie la page admin (et non la boutique)', rAdm.status === 200 && /id="adm-root"/.test(hAdm) && !/id="app"/.test(hAdm));
+    check('/admin affiche l’écran de connexion, pas le catalogue', /Espace vendeur/.test(hAdm) && !/Ajouter au panier/.test(hAdm));
+    check('/admin/ (avec slash final) sert la même page', /id="adm-root"/.test(await (await fetch(BASE + '/admin/')).text()));
+    check('/admin n’est pas indexable (noindex)', /noindex/.test(hAdm) && /noindex/.test('' + rAdm.headers.get('x-robots-tag')));
+    check('/admin : réponse non mise en cache', /no-store/.test('' + rAdm.headers.get('cache-control')));
+    check('le script de l’espace vendeur est servi', /TOKEN_KEY/.test(await (await fetch(BASE + '/admin/admin.js')).text()));
+    check('la feuille de style de l’espace vendeur est servie', /--rose/.test(await (await fetch(BASE + '/css/admin.css')).text()));
+    check('l’ancien chemin /js/admin.js n’existe plus', (await fetch(BASE + '/js/admin.js')).status === 404);
+    const hIdx = await (await fetch(BASE + '/')).text();
+    check('page d’accueil : aucun mot « admin »', !/admin/i.test(hIdx));
+    const jsApp = await (await fetch(BASE + '/js/app.js')).text();
+    check('boutique : plus aucun lien « Espace vendeur » cliquable', !/>\s*Espace vendeur\s*</.test(jsApp) && !/href="#\/admin"/.test(jsApp));
+    check('boutique : le code admin n’est jamais chargé', !/\/js\/admin\.js|window\.Admin/.test(jsApp));
+    check('boutique : #/admin (vieux favori) redirige vers /admin', /location\.replace\('\/admin'/.test(jsApp));
+    check('thème : la palette féminine est dans la feuille de style', /--rose:\s*#c2426f/.test(await (await fetch(BASE + '/css/style.css')).text()));
+    check('thème : plus aucune couleur du vieux thème sombre', !/--bg:\s*#12100f/.test(await (await fetch(BASE + '/css/style.css')).text()));
+    const rPerdu = await fetch(BASE + '/css/pas-la.css');
+    check('asset manquant → 404 (et non la page du site)', rPerdu.status === 404 && !/id="app"/.test(await rPerdu.text()));
     check('export CSV commandes', (await fetch(BASE + '/api/admin/commandes-export', { headers: { Authorization: 'Bearer ' + tok } })).headers.get('content-type')?.includes('csv'));
   } catch (e) {
     ko++;

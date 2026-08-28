@@ -1,0 +1,47 @@
+/* ============================================================
+   CHEZ FATOUCHA — espace ADMIN (page /admin, thème assorti)
+   Elle hérite des variables de style.css et n'ajoute que le
+   nécessaire au back-office.
+   ============================================================ */
+body.adm { background: var(--paper); }
+.adm-shell { min-height: 100vh; display: flex; flex-direction: column; }
+
+.adm-top {
+  position: sticky; top: 0; z-index: 30;
+  background: linear-gradient(100deg, #35192e 0%, #5c2246 55%, #7c2c4e 100%);
+  color: #ffeaf2; border-bottom: 1px solid #6b2a4c;
+}
+.adm-top .in { display: flex; align-items: center; gap: 14px; height: 62px; flex-wrap: wrap; padding: 8px 16px }
+.adm-top .brand b { color: #fff }
+.adm-top .brand small { color: #f3b9d0 }
+.adm-tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin-left: 6px }
+.adm-tabs::-webkit-scrollbar { display: none }
+.adm-tabs a {
+  padding: 8px 13px; border-radius: 999px; font-size: 13.5px; font-weight: 650; color: #f6d7e4;
+  white-space: nowrap; text-decoration: none; border: 1px solid transparent;
+}
+.adm-tabs a:hover { background: rgba(255,255,255,.12) }
+.adm-tabs a.on { background: #fff; color: var(--rose-2); border-color: #ffd0e0 }
+.adm-top .who { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13px }
+.adm-top .who .btn { height: 34px; font-size: 13px }
+
+.adm-main { flex: 1 1 auto; width: 100%; max-width: 1180px; margin: 0 auto; padding: 20px 16px 60px }
+.adm-foot { padding: 14px 16px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); background: var(--card) }
+
+/* --- écran de connexion --- */
+.adm-login { min-height: 100vh; display: grid; place-items: center; padding: 22px;
+  background: radial-gradient(110% 70% at 50% -10%, #5c2246 0%, #2b1726 60%) }
+.adm-login .card-box {
+  width: min(430px, 100%); background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--r-lg); padding: 26px 22px; box-shadow: var(--sh-lg)
+}
+.adm-login .lock { width: 54px; height: 54px; border-radius: 18px 18px 18px 6px; display: grid; place-items: center;
+  font-size: 24px; margin: 0 auto 12px; background: linear-gradient(135deg, var(--rose), var(--gold)); color: #fff }
+.adm-login h1 { font-family: var(--serif); font-size: 20px; text-align: center; margin: 0 0 4px }
+.adm-login .sub { text-align: center; color: var(--muted); font-size: 13px; margin: 0 0 18px }
+.adm-login .note { margin-top: 16px; padding: 10px 12px; border-radius: var(--r); background: var(--blush);
+  border: 1px solid var(--line); font-size: 12px; color: var(--muted) }
+
+/* --- indicateur « espace privé » --- */
+.private-flag { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700;
+  color: var(--rose-2); background: var(--rose-soft); border: 1px solid #f4cfe0; padding: 5px 11px; border-radius: 999px }

@@ -53,6 +53,7 @@ const J = async (method, url, body, token) => {
   child.stdout.on('data', (d) => { logs += d; });
   child.stderr.on('data', (d) => { logs += d; });
   let dom;
+  let domAdm;
 
   try {
     // serveur prêt
@@ -61,6 +62,7 @@ const J = async (method, url, body, token) => {
       await wait(250);
     }
 
+    const jetonAdmin = (await J('POST', '/api/admin/login', { username: 'admin', password: 'test12345' })).data.token;
     const cfgR = await J('GET', '/api/config');
     const zero = (cfgR.data.zones || [])[0];
     const prod1 = (await J('GET', '/api/produits/1')).data;
@@ -70,18 +72,14 @@ const J = async (method, url, body, token) => {
     vc.on('error', (...a) => erreurs.push(a.join(' ')));
     vc.on('warn', () => {});
 
-    dom = await JSDOM.fromURL(BASE + '/#/', {
-      runScripts: 'dangerously',
-      resources: 'usable',
-      pretendToBeVisual: true,
-      virtualConsole: vc,
-      beforeParse(window) {
-        // jsdom n'a pas de fetch : on branché celui de Node, en résolvent les URLs relatives.
-        window.fetch = (input, init) => fetch(new URL(typeof input === 'string' ? input : input.url, BASE + '/').toString(), init);
-        for (const k of ['Response', 'Request', 'Headers', 'FormData', 'Blob', 'File']) if (globalThis[k]) window[k] = globalThis[k];
-        window.scrollTo = () => {};
-      },
-    });
+    /* jsdom n'a pas de fetch : on branche celui de Node, en résolvant les URLs relatives. */
+    const brancher = (window) => {
+      window.fetch = (input, init) => fetch(new URL(typeof input === 'string' ? input : input.url, BASE + '/').toString(), init);
+      for (const k of ['Response', 'Request', 'Headers', 'FormData', 'Blob', 'File']) if (globalThis[k]) window[k] = globalThis[k];
+      window.scrollTo = () => {};
+    };
+    const opts = { runScripts: 'dangerously', resources: 'usable', pretendToBeVisual: true, virtualConsole: vc };
+    dom = await JSDOM.fromURL(BASE + '/#/', { ...opts, beforeParse: (window) => { brancher(window); if (jetonAdmin) window.localStorage.setItem('fatoucha_admin_token', jetonAdmin); } });
     const w = dom.window;
     w.scrollTo = () => {};
     check('page chargée sans erreur JS', erreurs.length === 0, '\n     ' + erreurs.slice(0, 3).join('\n     '));
@@ -190,36 +188,53 @@ const J = async (method, url, body, token) => {
     check('suivi : alerte paiement en attente', /en attente/i.test(d.body.textContent));
     check('suivi : rappel de l’article commandé', d.body.textContent.includes(prod1.titre));
 
-    /* --- admin --- */
-    const login = await J('POST', '/api/admin/login', { username: 'admin', password: 'test12345' });
-    w.localStorage.setItem('fatoucha_admin_token', login.data.token);
-    w.location.hash = '#/admin/produits';
-    await until(() => d.querySelectorAll('[data-edit]').length > 0, { label: 'table admin' });
-    check('admin : tableau des produits rendu', d.querySelectorAll('table.tbl tbody tr').length === 8, `(${d.querySelectorAll('table.tbl tbody tr').length})`);
-    check('admin : lien fournisseur visible pour l’admin', /shein|vendeur local|TEMU/.test(d.body.textContent));
-    d.querySelector('[data-new]').click();
-    await until(() => d.getElementById('f-titre'), { label: 'formulaire produit' });
-    check('admin : formulaire produit complet', !!d.getElementById('f-prix') && !!d.getElementById('f-drop') && !!d.getElementById('f-vars'));
-    d.getElementById('f-titre').value = 'Jupe wax';
-    d.getElementById('f-prix').value = '14500';
-    d.getElementById('f-tailles').value = 'S, M';
-    d.getElementById('f-tailles').dispatchEvent(new w.Event('input'));
+    /* --- admin : le client ne doit RIEN voir de l'espace vendeur --- */
+    check('boutique : aucun lien « Espace vendeur » dans l’écran', !/Espace vendeur/.test(d.body.textContent));
+    check('boutique : aucun lien caché vers #/admin', !d.querySelector('a[href*="admin"]'));
+    w.location.hash = '#/admin';
+    await until(() => /ESPACE VENDEUR/.test(d.getElementById('app').textContent), { label: 'écran de redirection legacy' });
+    check('vieux favori #/admin : renvoyé vers la page /admin (et non rendu dans la boutique)', !d.querySelector('.adm-tabs') && !d.querySelector('table.tbl'));
+    w.location.hash = '#/';
+    await until(() => d.querySelectorAll('.card').length > 0, { label: 'retour catalogue' });
+
+    /* --- espace vendeur : page séparée /admin, ouverte dans sa propre fenêtre --- */
+    domAdm = await JSDOM.fromURL(BASE + '/admin#produits', { ...opts, beforeParse: (window) => { brancher(window); window.localStorage.setItem('fatoucha_admin_token', jetonAdmin); } });
+    const wa = domAdm.window;
+    const da = wa.document;
+    check('admin : page indépendante du catalogue (pas de panier, pas de hero)', da.querySelectorAll('.card').length === 0 && !/Ajouter au panier/.test(da.body.textContent));
+    await until(() => da.querySelectorAll('[data-edit]').length > 0, { label: 'table admin' });
+    check('admin : onglets propres à l’espace vendeur, aucun menu cliente', !!da.querySelector('.adm-tabs') && !da.querySelector('nav.main') && !da.querySelector('[data-cart-count]'));
+    check('admin : marque de la boutique rappelée', /CHEZ FATOUCHA/i.test(da.querySelector('.adm-top').textContent));
+    check('admin : tableau des produits rendu', da.querySelectorAll('table.tbl tbody tr').length === 8, `(${da.querySelectorAll('table.tbl tbody tr').length})`);
+    check('admin : lien fournisseur visible pour l’admin', /shein|vendeur local|TEMU/.test(da.body.textContent));
+    da.querySelector('[data-new]').click();
+    await until(() => da.getElementById('f-titre'), { label: 'formulaire produit' });
+    check('admin : formulaire produit complet', !!da.getElementById('f-prix') && !!da.getElementById('f-drop') && !!da.getElementById('f-vars'));
+    da.getElementById('f-titre').value = 'Jupe wax';
+    da.getElementById('f-prix').value = '14500';
+    da.getElementById('f-tailles').value = 'S, M';
+    da.getElementById('f-tailles').dispatchEvent(new wa.Event('input'));
     await wait(80);
-    check('admin : grille de stock par variante auto-générée', d.querySelectorAll('#f-vars .cell').length === 2, `(${d.querySelectorAll('#f-vars .cell').length})`);
-    d.getElementById('f-save').click();
-    await until(() => /Jupe wax/.test(d.querySelector('#admin-body').textContent), { label: 'produit créé dans la liste' });
-    check('admin : création visible dans le catalogue', /Jupe wax/.test(d.querySelector('#admin-body').textContent));
-    d.querySelector('[data-tab="commandes"]').click();
-    await until(() => /CMD-/.test(d.querySelector('#admin-body')?.textContent || ''), { label: 'vue commandes' });
-    check('admin : la commande du client est visible', /CMD-/.test(d.querySelector('#admin-body').textContent));
-    check('admin : statut “en attente” de paiement', /⏳ wave|en attente/.test(d.querySelector('#admin-body').textContent));
-    d.querySelector('[data-open]').click();
-    await until(() => /Paiement reçu/.test(d.body.textContent), { label: 'détail commande' });
-    check('admin : bouton de validation du paiement', /Paiement reçu/.test(d.body.textContent));
-    check('admin : bordereau livreur proposé', /Bordereau livreur/.test(d.body.textContent));
-    d.querySelector('[data-mark-paid]').click();
-    await until(() => /préparation/.test(d.querySelector('#admin-body')?.textContent || ''), { label: 'statut après validation' });
-    check('après validation admin, la commande passe en préparation', /préparation/.test(d.querySelector('#admin-body').textContent));
+    check('admin : grille de stock par variante auto-générée', da.querySelectorAll('#f-vars .cell').length === 2, `(${da.querySelectorAll('#f-vars .cell').length})`);
+    da.getElementById('f-save').click();
+    await until(() => /Jupe wax/.test(da.querySelector('#admin-body').textContent), { label: 'produit créé dans la liste' });
+    check('admin : création visible dans la liste', /Jupe wax/.test(da.querySelector('#admin-body').textContent));
+    check('admin : le produit créé est aussi visible côté cliente', await (async () => {
+      await wait(150);
+      return (await J('GET', '/api/produits?q=Jupe')).data.some((x) => x.titre === 'Jupe wax');
+    })());
+    da.querySelector('[data-tab="commandes"]').click();
+    await until(() => /CMD-/.test(da.querySelector('#admin-body')?.textContent || ''), { label: 'vue commandes' });
+    check('admin : changement d’onglet par hash interne (#commandes)', wa.location.hash === '#commandes');
+    check('admin : la commande du client est visible', /CMD-/.test(da.querySelector('#admin-body').textContent));
+    check('admin : statut “en attente” de paiement', /⏳ wave|en attente/.test(da.querySelector('#admin-body').textContent));
+    da.querySelector('[data-open]').click();
+    await until(() => /Paiement reçu/.test(da.body.textContent), { label: 'détail commande' });
+    check('admin : bouton de validation du paiement', /Paiement reçu/.test(da.body.textContent));
+    check('admin : bordereau livreur proposé', /Bordereau livreur/.test(da.body.textContent));
+    da.querySelector('[data-mark-paid]').click();
+    await until(() => /préparation/.test(da.querySelector('#admin-body')?.textContent || ''), { label: 'statut après validation' });
+    check('après validation admin, la commande passe en préparation', /préparation/.test(da.querySelector('#admin-body').textContent));
     /* le client voit le paiement confirmé sur sa page de suivi */
     w.location.hash = '#/commande/' + ref + '?tel=771234567';
     await until(() => /Payement valid|Paiement validé/.test(d.body.textContent), { label: 'suivi mis à jour' });
@@ -232,6 +247,7 @@ const J = async (method, url, body, token) => {
     if (dom) console.error('   body:', dom.window.document.body.textContent.slice(0, 400).replace(/\s+/g, ' '));
     console.error('--- logs serveur (fin) ---\n' + logs.slice(-1200));
   } finally {
+    if (domAdm) domAdm.window.close();
     child.kill('SIGTERM');
     fs.rmSync(DATA, { recursive: true, force: true });
   }

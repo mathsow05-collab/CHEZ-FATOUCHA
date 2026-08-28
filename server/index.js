@@ -69,12 +69,26 @@ app.use('/uploads', express.static(UPLOADS_DIR, { maxAge: '7d', immutable: true,
 /* Visuels de démonstration livrés avec le code. */
 app.use('/media', express.static(path.join(PUBLIC_DIR, 'media'), { maxAge: '1d' }));
 
+/* ---------------- Frontend — espace vendeur (page séparée) ----------------
+   /admin sert public/admin/index.html, une page à part : la boutique n'en
+   parle nulle part (ni lien, ni menu) et le code admin n'est jamais chargé
+   côté cliente. L'URL reste protégée par identifiant + mot de passe. */
+const PAGE_ADMIN = path.join(PUBLIC_DIR, 'admin', 'index.html');
+app.get(['/admin', '/admin/'], (req, res, next) => {
+  if (!fs.existsSync(PAGE_ADMIN)) return res.status(503).send('Page admin absente : public/admin/index.html introuvable.');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow'); /* hors des moteurs de recherche */
+  return res.sendFile(PAGE_ADMIN);
+});
+
 /* ------------------------- Frontend (SPA à hash) ------------------------- */
 app.use(express.static(PUBLIC_DIR, { extensions: ['html'], index: 'index.html' }));
 /* Toute URL qui n'est pas une ressource de l'API renvoie le SPA (routes à #). */
 app.use((req, res, next) => {
   const p = req.path || '/';
   if (req.method !== 'GET' || p.startsWith('/api/') || p.startsWith('/uploads/') || p.startsWith('/media/')) return next();
+  /* une URL qui ressemble à un fichier (asset manquant) doit rester un 404 */
+  if (/\.(js|mjs|css|map|png|jpe?g|gif|svg|webp|ico|json|txt|xml|woff2?|mp4)$/i.test(p)) return next();
   const index = path.join(PUBLIC_DIR, 'index.html');
   if (!fs.existsSync(index)) return res.status(503).send('index.html manquant dans public/.');
   return res.sendFile(index);
@@ -97,7 +111,7 @@ app.use((err, req, res, next) => {
 const seeded = seed();
 if (seeded.admins.length) {
   const lignes = ['', '=== CHEZ FATOUCHA — compte admin créé au premier lancement ==='];
-  for (const a of seeded.admins) lignes.push(`  ${a.username} / ${a.password}   (espace /#/admin)`);
+  for (const a of seeded.admins) lignes.push(`  ${a.username} / ${a.password}   →  http://localhost:${PORT}/admin`);
   lignes.push('  ⚠ Change ces identifiants via ADMIN1_USERNAME / ADMIN1_PASSWORD (.env ou Render).');
   console.warn(lignes.join('\n'));
 }

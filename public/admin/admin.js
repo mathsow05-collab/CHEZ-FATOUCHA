@@ -1,15 +1,24 @@
 /* ============================================================
-   CHEZ FATOUCHA — espace administrateur (chargé sur #/admin)
-   Produits, commandes (validation paiement + statuts), zones, réglages.
+   CHEZ FATOUCHA — ESPACE ADMIN (page autonome, URL /admin)
+   Inaccessible depuis la boutique : aucun lien, aucun menu. Ouvre
+   cette page puis connecte-toi. Produits, commandes (validation du
+   paiement + statuts), zones de livraison, réglages.
    ============================================================ */
 const TOKEN_KEY = 'fatoucha_admin_token';
-const S = { vue: 'dash', commandes: { filtre: 'toutes', q: '' }, produits: { q: '', etat: 'tous' } };
-let A = null; // conteneur racine
+const VUES = ['dash', 'commandes', 'produits', 'zones', 'reglages'];
+const S = { vue: 'dash', pret: false, commandes: { filtre: 'toutes', q: '' }, produits: { q: '', etat: 'tous' } };
+const vueDuHash = () => (location.hash || '').replace(/^#\/?/, '').split('?')[0];
+let A = null; // conteneur racine (#adm-root)
 
 /* --------- helpers --------- */
 const A_el = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; };
-/* Changer d'onglet sans re-démonter l'app : on remplace l'URL sans événement. */
-const A_go = (v) => { S.vue = v; try { history.replaceState(null, '', '#/admin/' + v); } catch { location.hash = '#/admin/' + v; } dessiner(); };
+/* Onglet = hash interne (#commandes) : l'URL de base reste /admin (rien à
+   configurer côté serveur) et le bouton retour du navigateur fonctionne. */
+const A_go = (v) => {
+  const cible = '#' + v;
+  if (location.hash === cible) return dessiner();
+  location.hash = cible;
+};
 
 function modal(titre, contenu, large = false) {
   const m = A_el(`<div class="modal"><div class="sheet" ${large ? 'style="max-width:1080px"' : ''}>
@@ -24,7 +33,11 @@ async function aReq(method, url, body) {
   const headers = { Authorization: 'Bearer ' + (localStorage.getItem(TOKEN_KEY) || '') };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   const res = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
-  if (res.status === 401) { localStorage.removeItem(TOKEN_KEY); rendreLogin(); throw new Error('Session expirée, reconnecte-toi.'); }
+  if (res.status === 401) {
+    localStorage.removeItem(TOKEN_KEY);
+    if (A && S.pret) { S.pret = false; rendreLogin('Session expirée : reconnecte-toi.'); }
+    throw new Error('Session expirée, reconnecte-toi.');
+  }
   let data = null;
   try { data = await res.json(); } catch { /* vide */ }
   if (!res.ok) throw new Error((data && data.error) || 'Erreur ' + res.status);
@@ -35,12 +48,19 @@ async function aReq(method, url, body) {
 function coquille() {
   const tabs = [['dash', '📊 Tableau de bord'], ['commandes', '📦 Commandes'], ['produits', '👗 Produits'], ['zones', '🚚 Zones & délais'], ['reglages', '⚙️ Réglages']];
   return `
-  <header class="top"><div class="wrap bar">
-    <a class="brand" href="#/"><span class="logo">🛍️</span><span><b>${esc(A.cfg?.nom_boutique || 'CHEZ FATOUCHA')}</b><small>ESPACE VENDEUR</small></span></a>
-    <nav class="main">${tabs.map(([k, l]) => `<a href="#/admin/${k}" class="${S.vue === k ? 'on' : ''}" data-tab="${k}">${l}</a>`).join('')}</nav>
-    <div class="actions"><a class="icon-btn" href="#/">👁️ Boutique</a><button class="icon-btn" data-logout>Déconnexion</button></div>
-  </div></header>
-  <main class="wrap admin" id="admin-body"></main>`;
+  <div class="adm-shell">
+    <header class="adm-top"><div class="in">
+      <span class="brand"><span class="logo">🛍️</span><span><b>${esc(A.cfg?.nom_boutique || 'CHEZ FATOUCHA')}</b><small>Espace vendeur — privé</small></span></span>
+      <nav class="adm-tabs">${tabs.map(([k, l]) => `<a href="#${k}" class="${S.vue === k ? 'on' : ''}" data-tab="${k}">${l}</a>`).join('')}</nav>
+      <div class="who">
+        <span class="private-flag">🔒 ${esc(A.who?.admin?.display_name || A.who?.admin?.username || '')}</span>
+        <a class="btn sm ghost" href="/" target="_blank" rel="noopener">Voir la boutique</a>
+        <button class="btn sm ghost" data-logout>Quitter</button>
+      </div>
+    </div></header>
+    <main class="adm-main" id="admin-body"></main>
+    <footer class="adm-foot">Espace de gestion : les clientes n'ont pas ce lien et ne voient ni les prix d'achat, ni les liens fournisseurs.<span id="adm-mode"></span></footer>
+  </div>`;
 }
 
 async function dessiner() {
@@ -48,7 +68,14 @@ async function dessiner() {
   if (!body) return;
   try {
     A.cfg = await API.get('/api/config');
-    document.querySelectorAll('[data-tab]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); A_go(a.dataset.tab); }));
+    document.querySelectorAll('[data-tab]').forEach((a) => {
+      a.classList.toggle('on', a.dataset.tab === S.vue);
+      a.addEventListener('click', (e) => { e.preventDefault(); A_go(a.dataset.tab); });
+    });
+    const mode = document.getElementById('adm-mode');
+    if (mode) mode.textContent = A.paiement_mode === 'cinetpay'
+      ? ' · Paiement Wave / Orange Money automatique ✔'
+      : ' · Paiement : validation manuelle à cocher dans 📦 Commandes.';
     if (S.vue === 'dash') await vueDash(body);
     else if (S.vue === 'commandes') await vueCommandes(body);
     else if (S.vue === 'produits') await vueProduits(body);
@@ -60,16 +87,18 @@ async function dessiner() {
 }
 
 /* --------- login --------- */
-function rendreLogin() {
-  A.innerHTML = `<div class="login-box">
-    <div class="center" style="margin-bottom:14px"><div class="brand" style="justify-content:center"><span class="logo">🛍️</span><span><b>CHEZ FATOUCHA</b><small>ESPACE VENDEUR</small></span></div></div>
+function rendreLogin(msg) {
+  A.innerHTML = `<div class="adm-login"><div class="card-box">
+    <div class="lock">🔒</div>
+    <h1>Espace vendeur</h1>
+    <p class="sub">Réservé à la boutique — les clientes restent sur le catalogue.</p>
     <div class="stack">
-      <div class="field"><label for="l-u">Identifiant</label><input id="l-u" class="inp" autocomplete="username" value="admin" /></div>
+      <div class="field"><label for="l-u">Identifiant</label><input id="l-u" class="inp" autocomplete="username" /></div>
       <div class="field"><label for="l-p">Mot de passe</label><input id="l-p" class="inp" type="password" autocomplete="current-password" /></div>
       <button class="btn gold big block" id="l-btn">Se connecter</button>
-      <div id="l-err"></div>
-      <div class="small muted">Comptes créés au premier lancement via <span class="mono">ADMIN1_USERNAME</span> / <span class="mono">ADMIN1_PASSWORD</span> (voir <span class="mono">.env</span> ou Render).</div>
-    </div></div>`;
+      <div id="l-err">${msg ? `<div class="banner ko">${esc(msg)}</div>` : ''}</div>
+      <div class="note">Identifiants définis au déploiement par <span class="mono">ADMIN1_USERNAME</span> / <span class="mono">ADMIN1_PASSWORD</span> (fichier <span class="mono">.env</span> en local, <em>Variables</em> dans Render).</div>
+    </div></div></div>`;
   const submit = async () => {
     const u = document.getElementById('l-u').value.trim();
     const p = document.getElementById('l-p').value;
@@ -95,7 +124,7 @@ async function vueDash(body) {
   body.innerHTML = `
   <div class="row spread" style="flex-wrap:wrap;gap:10px">
     <div><h2 style="margin:0">Bonjour 👋</h2><p class="small muted" style="margin:2px 0 0">Voici la boutique maintenant. ${d.paiement_mode === 'cinetpay' ? 'Paiement automatique actif ✔' : 'Paiement : validation manuelle (ajoute tes clés CinetPay pour automatiser).'}</p></div>
-    <div class="row"><button class="btn sm ghost" data-reload>↻ Actualiser</button><a class="btn sm" href="#/admin/commandes">Voir les commandes</a></div>
+    <div class="row"><button class="btn sm ghost" data-reload>↻ Actualiser</button><a class="btn sm" href="#commandes">Voir les commandes</a></div>
   </div>
   <div class="kpis">
     <div class="kpi"><b>${fcfa(d.ca_jour)}</b><span>CA encaissé aujourd'hui</span></div>
@@ -110,7 +139,7 @@ async function vueDash(body) {
 
   <div class="pd">
     <div class="bloc stack">
-      <div class="row spread"><h3 style="margin:0">Dernières commandes</h3><a class="link" href="#/admin/commandes">tout voir →</a></div>
+      <div class="row spread"><h3 style="margin:0">Dernières commandes</h3><a class="link" href="#commandes">tout voir →</a></div>
       ${d.derniers_commandes.length ? `<div class="tbl-scroll"><table class="tbl"><thead><tr><th>Réf.</th><th>Client</th><th>Total</th><th>Paiement</th><th>Statut</th><th></th></tr></thead><tbody>
         ${d.derniers_commandes.map((c) => `<tr>
           <td class="mono small">${esc(c.reference)}</td>
@@ -622,21 +651,33 @@ async function vueReglages(body) {
 
 /* --------- entrée --------- */
 async function mont() {
+  A = document.getElementById('adm-root');
   const tok = localStorage.getItem(TOKEN_KEY);
   if (!tok) return rendreLogin();
   try { A.who = await aReq('GET', '/api/admin/moi'); }
   catch { return rendreLogin(); }
+  try { A.paiement_mode = (await aReq('GET', '/api/admin/dashboard')).paiement_mode; } catch { /* pas bloquant */ }
+  if (VUES.includes(vueDuHash())) S.vue = vueDuHash();
+  await dessinerInit();
+}
+
+/* Premier rendu : la coquille doit exister avant de dessiner la vue. */
+async function dessinerInit() {
   A.cfg = await API.get('/api/config');
   A.innerHTML = coquille();
-  const seg = hashPath().match(/^\/admin\/(\w+)/);
-  if (seg && ['dash', 'commandes', 'produits', 'zones', 'reglages'].includes(seg[1])) S.vue = seg[1];
-  document.querySelector('[data-logout]')?.addEventListener('click', () => { localStorage.removeItem(TOKEN_KEY); rendreLogin(); });
+  S.pret = true;
+  document.querySelector('[data-logout]')?.addEventListener('click', () => {
+    localStorage.removeItem(TOKEN_KEY);
+    S.pret = false;
+    if (location.hash) { location.hash = ''; return; }
+    rendreLogin();
+  });
   await dessiner();
 }
 
-window.Admin = {
-  async mount(container) {
-    A = container;
-    await mont();
-  },
-};
+window.addEventListener('hashchange', () => {
+  if (!S.pret) return;
+  const v = vueDuHash();
+  if (VUES.includes(v)) { S.vue = v; dessiner(); }
+});
+document.addEventListener('DOMContentLoaded', mont);

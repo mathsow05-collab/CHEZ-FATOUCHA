@@ -15,19 +15,24 @@ pour valider son panier** — Wave ou Orange Money.
 ```bash
 npm install
 cp .env.example .env          # optionnel en dev : des valeurs par défaut existent
-npm run smoke                 # 72 vérifications API (boutique, commande, paiement, admin)
-npm run test:front            # 43 vérifications du rendu réel (jsdom) : tout le parcours client
+npm run smoke                 # 87 vérifications API + pages servies (boutique, commande, paiement, admin)
+npm run test:front            # 51 vérifications du rendu réel (jsdom) : parcours client + espace vendeur
 npm start                     # http://localhost:3000
 ```
 
 | URL | Ce que c'est |
 | --- | --- |
-| `http://localhost:3000/#/` | la boutique côté client |
-| `http://localhost:3000/#/admin` | l'espace vendeur (admin) |
+| `http://localhost:3000/#/` | la boutique côté cliente |
+| `http://localhost:3000/admin` | **l'espace vendeur (admin) — page séparée** |
 | `http://localhost:3000/api/health` | sonde de vie (Render l'utilise) |
 
 Compte admin du premier lancement : variables `ADMIN1_USERNAME` / `ADMIN1_PASSWORD`
 (par défaut `admin` / `fatoucha2026` en local — **à changer absolument**).
+
+> L'espace vendeur n'apparaît **nulle part** dans la boutique : aucun lien, aucun bouton,
+> aucun menu. C'est une page à part, à ouvrir (ou à mettre en favori) sous `/admin` —
+> en ligne : `https://<ton-domaine>/admin`. Le code de l'admin n'est jamais chargé
+> ni envoyé au navigateur d'une cliente.
 
 ---
 
@@ -45,7 +50,13 @@ Compte admin du premier lancement : variables `ADMIN1_USERNAME` / `ADMIN1_PASSWO
 - **Suivi** : `#/suivi` avec référence + numéro → timeline *reçue → payée → préparation → expédiée → livrée*,
   total, articles, délai estimé, bouton WhatsApp, annulation tant que rien n'est payé.
 
-### Côté admin (`/#/admin`)
+### Côté admin — `/admin`, page privée à son propre lien
+
+Ouverture : tape `/admin` (le vieux `/#/admin` y renvoie automatiquement). Le changement
+d'onglet se fait par hash interne (`/admin#commandes`), donc rien à configurer côté serveur :
+une seule URL à partager, à personne d'autre qu'à toi.
+
+
 | Onglet | Contenu |
 | --- | --- |
 | 📊 Tableau de bord | CA du jour / 7 j / total, commandes à payer, à préparer, en route, stock faible, meilleures ventes |
@@ -53,6 +64,13 @@ Compte admin du premier lancement : variables `ADMIN1_USERNAME` / `ADMIN1_PASSWO
 | 📦 Commandes | recherche (réf., nom, téléphone), filtres par statut, détail, **✔ Paiement reçu**, changement de statut, n° de transaction, **bordereau livreur imprimable**, export CSV |
 | 🚚 Zones & délais | tarif et délai par quartier/région, activation d'une zone, tout est modifiable |
 | ⚙️ Réglages | nom, slogan, contacts, adresse/horaires de retrait, **numéros Wave / Orange Money**, livraison offerte à partir de X, expiration des commandes impayées, clés CinetPay, mot de passe |
+
+### Le thème (boutique et admin)
+
+Rose poudré, prune, doré, arrondis : tout part des variables en haut de `public/css/style.css`
+(`--ink`, `--paper`, `--rose`, `--rose-soft`, `--blush`, `--lilac`, `--gold`, `--line`, `--r`,
+`--serif`). Change une ligne, tout le site suit. La page admin (`public/css/admin.css`) reprend
+exactement les mêmes variables — elle est assortie à la boutique sans la resservir.
 
 ### Règles métier codées
 - **Stock réservé dès la commande** (décrémenté), **remis en rayon** si la commande est annulée.
@@ -137,7 +155,12 @@ fatoucha/
 │   └── routes/
 │       ├── boutique.js  API publique (config, produits, commande, suivi)
 │       └── admin.js     API admin (auth, produits, variantes, upload, commandes, zones, réglages)
-├── public/            front vanilla (SPA à hash) : index.html, css/style.css, js/{api,app,admin}.js, media/
+├── public/            front vanilla, sans build :
+│   ├── index.html     coquille cliente (le routeur à # est dans js/app.js)
+│   ├── admin/         ESPACE VENDEUR = page séparée servie sur /admin (index.html + admin.js)
+│   ├── css/           style.css (thème + boutique) · admin.css (chrome de l'espace vendeur)
+│   ├── js/            api.js (aides partagées) · app.js (parcours cliente uniquement)
+│   └── media/         visuels de démo, favicon
 ├── scripts/           smoke-test.js (API), front-test.js (jsdom), make-demo-images.js
 ├── data/              base SQLite (créée au 1er lancement, non commitée)
 ├── uploads/produits/  photos téléversées (non commitées)
@@ -191,8 +214,10 @@ dans `render.yaml`). Alternative gratuite : sauvegarder régulièrement `data/fa
 ## 9. Tests
 
 ```bash
-npm run smoke        # 72 checks : catalogue, commande, stock, paiement, admin, zones, sécurité
-npm run test:front   # 43 checks : parcours client réel dans un DOM (jsdom) + espace admin
+npm run smoke        # 87 checks : catalogue, commande, stock, paiement, admin, zones, sécurité,
+                     # + « la page /admin est bien séparée et la cliente ne voit rien »
+npm run test:front   # 51 checks : parcours client réel dans un DOM (jsdom), puis espace vendeur
+                     # ouvert sur /admin dans sa propre fenêtre (produits, commandes, paiement)
 ```
 
 ## 10. Dépannage
@@ -204,6 +229,8 @@ npm run test:front   # 43 checks : parcours client réel dans un DOM (jsdom) + e
 | Render renvoie 404 sur `/api/health` | mauvais Root Directory (monorepo) ou service lancé sur le mauvais dépôt |
 | Commandes perdues après un redéploiement | plan gratuit sans disque → voir §7 |
 | « Le prestataire de paiement ne répond pas » | pas de clés CinetPay → mode manuel utilisé (normal) ; ou clés invalides → vérifier Site ID/API key |
+| Je ne vois pas l'espace admin, normal ? | Oui côté cliente : il n'a aucun lien. Ouvre `ton-domaine/admin` (ex. `https://chez-fatoucha.onrender.com/admin`) et connecte-toi |
+| `/admin` affiche la boutique | ancien code servi : vide le cache (Maj+F5) — la page admin doit finir par `id="adm-root"` dans le code source |
 | Import d'URL sans photo | SHEIN/Temu bloquent la lecture : téléverse la photo depuis ton téléphone |
 | Une photo distante ne s'affiche pas chez le client | elle doit être rapatriée (bouton *Ajouter* du champ URL) — le site ne hotlinke pas |
 | Besoin de repartir de zéro | supprimer `data/fatoucha.db` et relancer (les réglages/zones/produits de démo sont re-seed) |

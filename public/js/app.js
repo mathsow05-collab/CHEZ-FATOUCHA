@@ -1,6 +1,7 @@
 /* ============================================================
    CHEZ FATOUCHA — front client (SPA à hash, sans framework)
-   Routes : #/  #/produit/ID  #/panier  #/commande  #/paiement/REF  #/suivi  #/admin
+   Routes : #/  #/produit/ID  #/panier  #/commande  #/paiement/REF  #/suivi
+   L'espace vendeur n'est PAS ici : c'est une page à part, servie sur /admin.
    ============================================================ */
 const root = document.getElementById('app');
 const state = { produits: [], vue: {}, filtreCat: null, q: '', tri: 'recent' };
@@ -27,7 +28,6 @@ function topbar(active = '') {
       <nav class="main">
         <a href="#/" class="${active === 'boutique' ? 'on' : ''}">Boutique</a>
         <a href="#/suivi" class="${active === 'suivi' ? 'on' : ''}">Suivre ma commande</a>
-        <a href="#/admin" class="${active === 'admin' ? 'on' : ''}">Espace vendeur</a>
       </nav>
       <div class="actions">
         <button class="icon-btn" data-open-search title="Rechercher">🔍<span class="hidden"> </span></button>
@@ -575,6 +575,17 @@ async function vueSuivi(ref = '', tel = '') {
 async function render() {
   const path = hashPath();
   const m = (re) => path.match(re);
+
+  /* « Espace vendeur » est devenu une vraie page séparée (/admin). Les vieux
+     favoris #/admin... sont renvoyés là, avec leur onglet ; le code admin
+     n'est jamais chargé ni affiché dans la boutique. */
+  const exAdmin = path.match(/^\/admin(?:\/(\w+))?(?:[?#].*)?$/);
+  if (exAdmin) {
+    root.innerHTML = '<div class="boot"><div class="boot-logo">ESPACE VENDEUR</div><div class="boot-bar"><i></i></div></div>';
+    location.replace('/admin' + (exAdmin[1] ? '#' + exAdmin[1] : ''));
+    return;
+  }
+
   try {
     await Shop.load();
     let html = '';
@@ -590,31 +601,15 @@ async function render() {
       html = await vueSuivi(mm[1], tel);
     }
     else if (m(/^\/suivi/)) html = await vueSuivi();
-    else if (m(/^\/admin/)) html = await vueAdminShell();
     else html = await vueBoutique();
     root.innerHTML = html;
     bind(html);
     Cart.renderBadge();
-    if (!/^\/admin/.test(path)) window.scrollTo(0, 0);
+    window.scrollTo(0, 0);
   } catch (e) {
     console.error(e);
     root.innerHTML = `<div class="wrap" style="padding:40px 16px"><div class="banner ko">Le site n’arrive pas à joindre le serveur (${esc(e.message)}). Vérifie que le serveur tourne, puis recharge.</div></div>`;
   }
-}
-
-let adminReady = null;
-function vueAdminShell() {
-  if (!adminReady) {
-    adminReady = new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = '/js/admin.js';
-      s.onload = () => resolve(window.Admin);
-      s.onerror = () => reject(new Error('admin.js introuvable'));
-      document.head.appendChild(s);
-    });
-  }
-  Promise.resolve(adminReady).then((A) => A && A.mount(root, { topbar, footer, go }));
-  return '<div class="boot"><div class="boot-logo">ESPACE VENDEUR</div><div class="boot-bar"><i></i></div></div>';
 }
 
 /* ---------------- événements ---------------- */
