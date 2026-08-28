@@ -45,6 +45,7 @@ function svg({ emoji, titre, a }) {
 </svg>`;
 }
 
+async function principal() {
 let n = 0;
 for (const it of ITEMS) {
   const clean = { ...it, a: it.a.replace(/[^#0-9a-fA-F]/g, '') || '#c9455c' };
@@ -59,4 +60,73 @@ fs.writeFileSync(
   'utf8'
 );
 
-console.log(`✔ ${n} visuels de démo + favicon dans ${OUT}`);
+/* ------------------------------------------------------------------ */
+/* Deux vues de plus par produit, taillées dans la photo existante.     */
+/* Une fiche de mode a besoin de plusieurs plans (globale / détail du  */
+/* tissu / tombé du bas) : c'est ce qui fait qu'on achète sans essayer. */
+/* ------------------------------------------------------------------ */
+let vus = 0;
+try {
+  const sharp = require('sharp');
+  for (const it of ITEMS) {
+    const src = path.join(OUT, it.file + '.jpg');
+    if (!fs.existsSync(src)) continue;
+    let meta;
+    try { meta = await sharp(src).metadata(); } catch { continue; }
+    const W = meta.width, H = meta.height;
+    if (!W || !H) continue;
+    const plans = [
+      { sortie: it.file + '-2.jpg', x: 0.19, y: 0.04, w: 0.62, h: 0.62 },
+      { sortie: it.file + '-3.jpg', x: 0.10, y: 0.34, w: 0.72, h: 0.64 },
+    ];
+    for (const plan of plans) {
+      const cw = Math.round(W * plan.w);
+      let ch = Math.round(cw * (4 / 3));
+      ch = Math.min(ch, H - Math.round(H * plan.y));
+      const gauche = Math.min(W - cw, Math.round(W * plan.x));
+      const haut = Math.min(H - ch, Math.round(H * plan.y));
+      if (cw < 200 || ch < 200) continue;
+      await sharp(src)
+        .extract({ left: gauche, top: haut, width: cw, height: ch })
+        .jpeg({ quality: 80, mozjpeg: true })
+        .toFile(path.join(OUT, plan.sortie));
+      vus += 1;
+    }
+  }
+} catch (e) {
+  console.warn('  (sharp indisponible : les vues supplémentaires sont sautées —', e.message + ')');
+}
+
+/* ------------------------------------------------------------------ */
+/* Icônes de l'application (PWA) : monogramme « CF » sur aubergine.     */
+/* ------------------------------------------------------------------ */
+let icone = 0;
+try {
+  const sharp = require('sharp');
+  const SVG_ICONE = (taille) => `<svg xmlns="http://www.w3.org/2000/svg" width="${taille}" height="${taille}" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#241a22"/>
+  <rect x="12" y="12" width="488" height="488" fill="none" stroke="#b8912f" stroke-opacity=".55" stroke-width="4"/>
+  <text x="256" y="${taille === 512 ? 322 : 318}" text-anchor="middle" font-family="Hoefler Text, Didot, Palatino, Georgia, serif" font-size="212" letter-spacing="8" fill="#d9b968">CF</text>
+</svg>`;
+  const PUB = path.join(__dirname, '..', 'public', 'media');
+  for (const taille of [192, 512]) {
+    await sharp(Buffer.from(SVG_ICONE(taille))).png().toFile(path.join(PUB, `icone-${taille}.png`));
+    icone += 1;
+  }
+  /* version « maskable » : marges plus larges pour les lances Android */
+  await sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="512" height="512" fill="#241a22"/><text x="256" y="330" text-anchor="middle" font-family="Hoefler Text, Didot, Palatino, Georgia, serif" font-size="168" letter-spacing="6" fill="#d9b968">CF</text></svg>`))
+    .png().toFile(path.join(PUB, 'icone-maskable.png'));
+  icone += 1;
+} catch (e) {
+  console.warn('  (icônes PWA non générées :', e.message + ')');
+}
+
+console.log(`✔ ${n} visuels de démo (+${vus} vues supplémentaires, ${icone} icône(s) PWA) dans ${OUT}`);
+
+
+}
+
+principal().catch((e) => {
+  console.error('✖ génération impossible :', e.message);
+  process.exit(1);
+});

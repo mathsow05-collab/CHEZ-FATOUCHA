@@ -23,7 +23,7 @@ npm start                     # http://localhost:3000
 
 | URL | Ce que c'est |
 | --- | --- |
-| `http://localhost:3000/#/` | la boutique côté cliente |
+| `http://localhost:3000/` | la boutique côté cliente (vraies URLs : `/boutique`, `/produit/<slug>`…) |
 | `http://localhost:3000/admin` | **l'espace vendeur — sa propre page (aucun lien côté cliente)** |
 | `http://localhost:3000/api/health` | sonde de vie (Render l'utilise) |
 
@@ -41,16 +41,54 @@ Compte admin du premier lancement : variables `ADMIN1_USERNAME` / `ADMIN1_PASSWO
 ## 2. Ce que fait le site
 
 ### Côté client
-- **Catalogue** : recherche (touche `/`), filtres par catégorie, tri par prix, badges promo / « plus que 3 » / rupture.
-- **Fiche produit** : galerie photo, description, **choix de la taille et du coloris**, quantité plafonnée
-  au stock de la variante, prix, **délai d'approvisionnement**, rappel des moyens de paiement.
-- **Panier** : quantités modifiables, sous-total, frais de livraison estimés.
+- **Catalogue** (`/`, `/boutique`, `/categorie/<slug>`) : recherche (touche `/`), filtres catégorie / taille /
+  prix / disponibilité, tri, badges promo · « plus que 3 » · rupture, « Voir plus » (le stock s'ajoute, il ne
+  remplace pas), et trois rangées personnelles : *Sélection de Fatou*, *Tes favoris*, *Vu récemment*.
+- **Fiche produit** (`/produit/<slug>`) : galerie multi-photos avec **loupe** (clic, flèches, molette, pincement),
+  **vidéo** de la pièce quand la boutique en a une, description, **taille + coloris** avec stock par variante,
+  quantité plafonnée au stock dispo, **prix + disponibilité + délai** regroupés près du CTA, barre d'action
+  collante sur mobile, bouton **Partager** (lien copié ou WhatsApp), et sur une rupture :
+  **« Préviens-moi quand ça revient »** (numéro gardé, la boutique écrit dès que la pièce revient).
+- **Guide des tailles et « Trouver ma taille »** : tableau en centimètres saisi article par article dans
+  l'admin, plus un calculateur (taille, poids, coupe préférée) qui propose une taille et l'applique d'un clic.
+  La ligne « *Photo portée par Awa, 1,72 m… elle porte du S* » est écrite par la boutique : c'est ce qui
+  réduit le plus les retours (mesure = premier motif d'échange dans la mode en ligne).
+- **Avis clientes** : note, texte, photo, taille reçue. Un avis **n'est jamais publié tout seul** — soit la
+  boutique le valide, soit il vient d'une commande livrée (mention « achat vérifié », publication immédiate).
+  La note moyenne et le nombre d'avis sortent dans le HTML et dans le balisage (`aggregateRating`).
+- **Recommandations** : « Dans le même esprit » (même catégorie, en stock d'abord) et « Ça complète le look »
+  (autre catégorie, prix dans le prolongement) sur la fiche, et « Ça complète ton panier » à l'étape panier.
+- **Panier** : quantités modifiables, sous-total, estimation des frais, **code de reprise** (retrouver son
+  panier sur un autre téléphone avec son numéro + ce code), bandeau de franchise pour la livraison offerte.
 - **Commande** : nom + téléphone, **livraison (zone → tarif + délai)** ou **retrait boutique (gratuit)**,
   adresse/repère, instructions, mode de paiement. Le total est **recalculé serveur** (le client ne peut
-  pas envoyer un prix bidon).
+  pas envoyer un prix bidon). En espèces, un **acompte** peut être demandé (voir « Règles métier codées »).
 - **Paiement** : voir §4.
-- **Suivi** : `#/suivi` avec référence + numéro → timeline *reçue → payée → préparation → expédiée → livrée*,
-  total, articles, délai estimé, bouton WhatsApp, annulation tant que rien n'est payé.
+- **Suivi** : `/suivi` avec référence + numéro (ou les 4 derniers chiffres, ou le code reçu) → timeline
+  *reçue → payée → préparation → expédiée → livrée*, total, articles cliquables, bouton
+  **« Je confirme que je suis là »**, et après livraison : **« Noter cet article »**.
+### Vitesse, référencement et installation (ce que la cliente ne voit pas, Google oui)
+- **Rendu serveur** des pages qui comptent : `/`, `/boutique`, `/categorie/<slug>`, `/produit/<slug>`,
+  `/faq`, `/retours`, `/livraison`, `/a-propos`. Le titre, le prix, les photos, la note et le fil d'Ariane
+  sont dans le HTML reçu, avant n'importe quel JavaScript. Le tunnel d'achat (panier, commande, paiement,
+  suivi) reste rendu côté client et est volontairement `noindex`.
+- **URLs lisibles** : `/produit/robe-longue-boheme-fleurie`, plus de `#/`. Une vieille URL en `#/produit/5`
+  fonctionne encore (elle est réécrite sans rechargement) et `/produit/5` renvoie un **301** vers le slug.
+- **Balisage** : `ClothingStore` (accueil), `Product` + `Offer` + `AggregateRating` + `Review` +
+  `BreadcrumbList` (fiche), `FAQPage` (questions écrites dans l'admin), sur chaque page rendue.
+- **Images à la volée** : `GET /img/<largeur>/<url d'origine>` recadre et sert de l'**AVIF** (ou du WebP si
+  le navigateur ne sait pas). Largeurs fermées `220 / 480 / 900 / 1200`, résultat écrit dans
+  `data/img-cache` (une fois par fichier et par taille), `Cache-Control: immutable` un an, et partout
+  `srcset` + `sizes` + `loading="lazy"` + `width/height` (donc aucun saut de mise en page). Un SVG, un
+  fichier manquant ou l'absence de `sharp` ne cassent rien : l'original est servi.
+- **`sitemap.xml`** (URLs canoniques uniquement), **`robots.txt`** (`/admin` et `/api/` fermés),
+  `canonical`, `og:*` et `twitter:*` sur toute page rendue → l'aperçu WhatsApp d'un lien partagé est propre.
+- **PWA** : `public/manifest.webmanifest` + service worker (`/sw.js`) et trois icônes dédiées —
+  « Ajouter à l'écran d'accueil » sur Android, et la coquille reste ouverte sans réseau.
+- **Mesure sans outil externe** : le front envoie des événements par lots (`vue_fiche`, `ajout_panier`,
+  `ouverture_commande`, `paiement_engage`, `commande_validee`, `recherche`, `zoom_photo`, `guide_tailles`,
+  `alerte_stock`, `avis_publie`, `clic_whatsapp`) à `/api/evenements`. Rien d'autre n'est gardé : pas de
+  cookie, pas de traceur tiers, l'identifiant de session vit en `sessionStorage`.
 
 ### Côté admin — `/admin`, une page à part
 
@@ -66,8 +104,11 @@ ne donne aucun accès.)
 | Onglet | Contenu |
 | --- | --- |
 | 📊 Tableau de bord | CA du jour / 7 j / total, commandes à payer, à préparer, en route, stock faible, meilleures ventes |
-| 👗 Produits | créer / modifier / masquer un article, prix de vente, **prix barré**, **prix d'achat (marge)**, marque, **lien fournisseur (jamais visible côté client)**, délai, **upload de photos par glisser-déposer**, tailles/coloris, **stock par variante**, ★ vedette, importer les photos depuis une URL de fiche |
+| 👗 Produits | créer / modifier / masquer un article, prix de vente, **prix barré**, **prix d'achat (marge)**, marque, **lien fournisseur (jamais visible côté client)**, délai, **upload de photos par glisser-déposer**, tailles/coloris, **stock par variante**, ★ vedette, importer les photos depuis une URL de fiche, **vidéo de fiche** (fichier téléversé ou lien), **guide des tailles par taille**, ligne « portée par … », légendes de photos |
 | 📦 Commandes | recherche (réf., nom, téléphone), filtres par statut, détail, **✔ Paiement reçu**, changement de statut, n° de transaction, **bordereau livreur imprimable**, export CSV |
+| ⭐ Avis | file des avis à valider, publier / retirer, **répondre sous l'avis** (la réponse part avec lui), corriger note ou texte, supprimer ; lien vers la fiche telle qu'elle est en ligne |
+| 📄 Contenus | réécriture des quatre pages du site (FAQ, retours, livraison, la maison) en markdown léger — `## Une question` devient une question dépliable **et** une entrée `FAQPage` pour Google |
+| 📈 Entonnoir | fiches vues → ajouts au panier → commandes commencées → paiements engagés → commandes → payées ; conversion, panier moyen, articles les plus vus, **articles sans avis**, **paniers abandonnés** (bouton WhatsApp de relance), demandes « préviens-moi au retour » à cocher |
 | 🚚 Zones & délais | tarif et délai par quartier/région, activation d'une zone, tout est modifiable |
 | ⚙️ Réglages | nom, slogan, contacts, adresse/horaires de retrait, **numéros Wave / Orange Money**, livraison offerte à partir de X, expiration des commandes impayées, clés CinetPay, mot de passe |
 
@@ -97,6 +138,22 @@ cloisonnement, aucun sélecteur mort. Les contrastes texte/fond sont au niveau A
   (35 000 F par défaut) → 0 F ; retrait boutique = toujours 0 F.
 - **Délai estimé** = délai d'approvisionnement de l'article le plus long + délai de la zone.
 - Numéros sénégalais validés (`77/76/78/70/72…`), anti-brute-force sur le login, limite de commandes/heure.
+- **Paiement en espèces gardé, mais encadré** (le COD est un signe de confiance, pas une lubie) : au-delà de
+  `cod_acompte_a_partir` (25 000 F par défaut) un **acompte** de `cod_acompte_montant` (2 000 F) est demandé
+  avant mise en route ; une cliente qui a déjà laissé deux commandes annulées paie un acompte quel que soit le
+  montant. Dans tous les cas la commande part **après confirmation de la cliente** : bouton sur `/paiement`
+  et `/suivi`, ou lien `/confirmer/<réf>/<code>` qui marche **sans JavaScript** (un simple formulaire POST),
+  ou message WhatsApp pré-rempli. Le code est écrit en clair sur la page et dans le bordereau : le livreur
+  le demande à la remise.
+- **Variante = taille et/ou coloris** : le stock demandé est la **somme** des variantes qui correspondent,
+  donc choisir seulement une taille est légal. Le décrément se répartit du coloris le plus fourni au moins
+  fourni ; l'annulation remet tout en rayon.
+- **Un PUT de l'admin qui n'envoie pas un champ ne l'efface pas** (photos, guide des tailles, ligne « portée
+  par », slug) : un import ou un vieux formulaire ne peut plus vider une fiche.
+- **Panier copié côté serveur** (jeton + code de reprise, 30 jours) : reprise sur un autre appareil et liste
+  des paniers abandonnés pour relancer. Le numéro seul ne suffit jamais à récupérer un panier.
+- **Avis** : celui d'une cliente attend la validation de la boutique ; celui d'une commande **livrée** est
+  publié direct et marqué « achat vérifié ». La note moyenne est calculée sur les seuls avis publiés.
 
 ---
 
@@ -166,7 +223,10 @@ fatoucha/
 ├── server/
 │   ├── index.js       Express : sécurité, API, static, SPA fallback, SIGTERM
 │   ├── db.js          schéma SQLite (produits, variantes, commandes, lignes, zones, réglages, logs)
-│   ├── catalogue.js   shapes publiques, stock réservé, annulation auto des impayés
+│   ├── catalogue.js   shapes publiques, stock par variante, recommandations, guide des tailles, annulation auto des impayés
+│   ├── pages.js       rendu serveur : accueil, boutique, catégorie, fiche, pages, confirmation, sitemap, robots
+│   ├── optima.js      images à la volée : /img/<largeur>/… → AVIF/WebP + cache disque (sharp)
+│   ├── seed.js        21 zones, catégories (avec slugs), réglages, 8 articles de démo, 4 pages de contenu
 │   ├── paiement.js    CinetPay (init/check/notify/retour) + mode manuel Wave/OM + deep links
 │   ├── scrape.js      lecture d'une page produit + téléchargement d'image (anti-SSRF)
 │   ├── security.js    scrypt, JWT HS256 maison, référence de commande, rate-limit, tel. SN
@@ -174,7 +234,8 @@ fatoucha/
 │       ├── boutique.js  API publique (config, produits, commande, suivi)
 │       └── admin.js     API admin (auth, produits, variantes, upload, commandes, zones, réglages)
 ├── public/            front vanilla, sans build :
-│   ├── index.html     coquille cliente (le routeur à # est dans js/app.js)
+│   ├── index.html     coquille cliente (le routeur par chemins est dans js/app.js)
+│   ├── manifest.webmanifest · sw.js   PWA : icônes, « ajouter à l'accueil », coquille hors-ligne
 │   ├── css/style.css  thème (variables) + boutique — rien de propre à l'admin
 │   ├── js/            api.js (aides partagées) · app.js (parcours cliente uniquement)
 │   └── media/         visuels de démo, favicon
@@ -238,13 +299,20 @@ dans `render.yaml`). Alternative gratuite : sauvegarder régulièrement `data/fa
 ## 9. Tests
 
 ```bash
-npm run check:css    # 8 checks : thème (palette Prestige), variables, cloisonnement CSS
-npm run smoke        # 97 checks : catalogue, commande, stock, paiement, admin, zones, sécurité,
-                     # + « le back-office a sa propre page, ses fichiers sont injoignables
-                     #  et rien, côté cliente, n'y mène ou ne les contient »
-npm run test:front   # 55 checks : parcours client réel dans un DOM (jsdom), puis back-office
-                     # ouvert sur son chemin privé dans sa propre fenêtre (onglets, produits,
-                     # commandes, validation du paiement)
+npm run check:css    # 8 checks : thème (palette Prestige), variables réellement définies, aucun
+                     # sélecteur mort (le CSS qui ne sert à rien est une dette), cloisonnement
+                     # boutique / back-office
+npm run smoke        # 184 checks : catalogue, commande, stock par variante, paiement, admin, zones,
+                     # sécurité ; rendu serveur + balisage + sitemap + robots ; pipeline d'images
+                     # (AVIF plus léger que WebP, cache disque, chemin tordu refusé) ; avis et
+                     # modération ; alertes de retour en stock ; panier enregistré et reprise ;
+                     # événements et entonnoir ; pages de contenu (markdown, échappement) ;
+                     # acompte COD et confirmation ; « rien, côté cliente, ne mène au back-office »
+npm run test:front   # 93 checks : parcours client réel dans un DOM (jsdom) — catalogue filtré, fiche
+                     # (vignettes, loupe, guide, calculateur de taille, avis envoyé), panier et reprise,
+                     # commande, paiement, suivi — puis back-office dans sa propre fenêtre (avis,
+                     # contenus, entonnoir, création d'un article avec guide et réassurance).
+                     # Le test échoue si la moindre erreur JavaScript apparaît pendant le parcours.
 ```
 
 ## 10. Dépannage

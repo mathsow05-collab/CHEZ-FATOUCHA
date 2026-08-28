@@ -343,3 +343,163 @@ h2, h3 { font-family: var(--serif); font-weight: 400; letter-spacing: -.006em }
 .marquee .wrap span:first-child { padding-left: 0 }
 .mini-form .lbl, .lbl { letter-spacing: .16em }
 .btn .emoji, .flag .emoji { letter-spacing: 0 }
+
+/* ============================================================
+   Enrichissements — galerie, tailles, avis, recommandations,
+   pages de contenu, confirmation de commande. Même registre
+   « Prestige » : ivoire, encre aubergine, filet or, capitales.
+   ============================================================ */
+
+/* Lien d'évitement : au clavier, on saute le bandeau et l'en-tête. */
+.saute { position: absolute; left: -9999px; top: 0; z-index: 60; background: var(--nacre); color: var(--encre); padding: 10px 16px; border: 1px solid var(--or); font-size: 12px; letter-spacing: .1em; text-transform: uppercase }
+.saute:focus { left: 12px; top: 12px }
+
+/* --- cartes --- */
+.card .lien-ph { display: block; width: 100%; height: 100% }
+.card .t a { color: inherit; text-decoration: none }
+.card .t a:hover { color: var(--bordeaux) }
+.card.compact { width: 210px; flex: 0 0 210px }
+.card.compact .t { font-size: 13.5px; min-height: 34px }
+.note-mini { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); letter-spacing: .02em }
+.note-mini b { color: var(--encre-2); font-weight: 600 }
+.cœur { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--filet-2); background: rgba(255, 253, 250, .86); color: var(--poussiere); cursor: pointer; font-size: 14px; line-height: 1; display: grid; place-items: center; opacity: 0; transition: opacity .18s ease, color .18s ease, transform .18s ease }
+.card:hover .cœur, .cœur.on, .cœur:focus-visible { opacity: 1 }
+.cœur.on { color: var(--bordeaux); border-color: rgba(109, 31, 70, .4); transform: scale(1.06) }
+.cœur:hover { color: var(--bordeaux) }
+
+/* --- rangées horizontales (sélection, favoris, recommandations) --- */
+.rang { padding-top: 8px }
+.rang-lignes { display: flex; gap: 18px; overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: 10px; scrollbar-width: thin }
+.rang-lignes .card { scroll-snap-align: start }
+.rang-lignes::-webkit-scrollbar { height: 4px }
+.rang-lignes::-webkit-scrollbar-thumb { background: var(--filet-2) }
+.rang .blk-head { border-bottom-color: var(--or-soft) }
+.rang-pied { display: flex; justify-content: center; padding-top: 22px }
+.rang.look .blk-head h2::after, .rang.selection .blk-head h2::after { content: ''; display: block; width: 42px; height: 1px; background: var(--or); margin-top: 8px; opacity: .6 }
+
+/* --- barre de filtres --- */
+.filtres-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 18px 26px; padding: 16px 18px; background: var(--nacre); border: 1px solid var(--filet); border-top: 2px solid var(--or-soft) }
+.filtres-bar .fl-tailles, .filtres-bar .fl-prix { display: grid; gap: 9px }
+.filtres-bar .lbl { font-size: 10px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--muted) }
+.filtres-bar .inp { height: 34px; width: 110px; padding: 0 10px; font-size: 12.5px }
+.filtres-bar .chip { min-width: 40px; padding: 7px 11px; font-size: 11px }
+.filtres { display: flex; gap: 8px; flex-wrap: wrap; align-items: center }
+.filtres .inp { height: 36px; padding: 0 10px; width: auto; min-width: 150px }
+
+/* --- galerie de la fiche --- */
+.gallery .main { position: relative; border: 0; padding: 0; margin: 0; width: 100%; background: var(--ivoire-2); cursor: zoom-in; display: block }
+.gal-compte { font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); text-align: right }
+/* Note (avis) sous le prix, sur la fiche. */
+.pd-note { display: flex; align-items: center; gap: 8px; margin-top: 9px; font-size: 12.5px }
+
+.gallery .main .loupe { position: absolute; right: 12px; bottom: 12px; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--filet-2); background: rgba(255, 253, 250, .9); color: var(--encre-2); display: grid; place-items: center; font-size: 15px; pointer-events: none }
+.gallery .main .loupe { position: absolute; right: 12px; bottom: 12px; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--filet-2); background: rgba(255, 253, 250, .9); color: var(--encre-2); display: grid; place-items: center; font-size: 15px; pointer-events: none }
+.video-box { border: 1px solid var(--filet); background: var(--encre) }
+.video-box video { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; max-height: 60vh }
+.video-box .small { padding: 8px 10px; background: var(--nacre); border-top: 1px solid var(--filet) }
+.gal-actions { display: flex; gap: 18px; flex-wrap: wrap; padding-top: 4px; border-top: 1px solid var(--filet) }
+.gal-actions .link.on { color: var(--bordeaux) }
+
+/* --- loupe plein écran --- */
+.modal.loupe { background: rgba(27, 17, 25, .93); display: grid; place-items: center; padding: 18px }
+.loupe-cadre { position: relative; width: min(94vw, 980px); max-height: 84vh; overflow: hidden; background: var(--encre); border: 1px solid rgba(184, 145, 47, .32) }
+.loupe-cadre img { display: block; width: 100%; height: 100%; object-fit: contain; transition: transform .22s ease; will-change: transform }
+.loupe-cadre img.zoome { object-fit: cover; cursor: zoom-out }
+.loupe .close { position: absolute; top: 14px; right: 16px; background: transparent; border: 1px solid rgba(217, 185, 104, .5); color: var(--or-clair); border-radius: 50%; width: 36px; height: 36px; cursor: pointer; font-size: 15px; z-index: 2 }
+.loupe-aide { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 18px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #cbb9c2; background: linear-gradient(transparent, rgba(27, 17, 25, .8)); text-align: center }
+.loupe-aide .mono { color: var(--or-clair) }
+.loupe-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 42px; height: 60px; border: 1px solid rgba(217, 185, 104, .35); background: rgba(36, 26, 34, .55); color: var(--or-clair); font-size: 22px; cursor: pointer; border-radius: 2px }
+.loupe-nav.prev { left: 10px }
+.loupe-nav.next { right: 10px }
+
+/* --- tailles --- */
+.puce-mannequin { font-size: 12.5px; color: var(--encre-2); background: var(--ivoire-2); border-left: 2px solid var(--or); padding: 9px 12px; letter-spacing: .01em }
+.opt-aide { display: flex; gap: 18px; flex-wrap: wrap }
+.guide-box summary { cursor: pointer; font-size: 12.5px; letter-spacing: .02em; color: var(--bordeaux); list-style: none }
+.guide-box summary::-webkit-details-marker { display: none }
+.guide-box summary::before { content: '+ '; color: var(--or) }
+.guide-box[open] summary::before { content: '– ' }
+table.guide { width: 100%; border-collapse: collapse; margin: 12px 0 4px; font-size: 12.5px }
+table.guide th, table.guide td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--filet) }
+table.guide thead th { font-size: 9.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--filet-2) }
+table.guide tbody th { font-weight: 600; letter-spacing: .1em; text-transform: uppercase; font-size: 11px }
+table.guide tr:last-child th, table.guide tr:last-child td { border-bottom: 0 }
+.note-choix .chip { min-width: 42px; font-size: 12px; letter-spacing: .12em; text-transform: none }
+
+/* --- avis --- */
+.etoiles { display: inline-flex; align-items: center; gap: 4px; color: var(--or); font-size: 13px; letter-spacing: .06em }
+.etoiles i { font-style: normal }
+.lien-avis { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--encre-2); text-decoration: none }
+.lien-avis b { color: var(--encre) }
+.avis-resume { display: grid; grid-template-columns: auto 1fr; gap: 22px; align-items: center; padding: 16px 18px; background: var(--nacre); border: 1px solid var(--filet); margin-bottom: 18px }
+.grosse-note b { font-family: var(--serif); font-size: 40px; font-weight: 400; line-height: 1 }
+.grosse-note span { font-size: 13px; color: var(--muted) }
+.barres { display: grid; gap: 5px }
+.bar { display: grid; grid-template-columns: 26px 1fr 20px; gap: 10px; align-items: center; font-size: 11px; color: var(--muted) }
+.bar i { display: block; height: 4px; background: var(--ivoire-2); }
+.bar b { display: block; height: 4px; background: var(--or); }
+.bar em { font-style: normal; text-align: right; color: var(--encre-2) }
+.avis-liste { display: grid; gap: 14px }
+.avis-item { padding: 15px 16px; background: var(--nacre); border: 1px solid var(--filet); border-left: 2px solid var(--or-soft) }
+.avis-item header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px }
+.avis-item header b { font-size: 13px; letter-spacing: .02em }
+.avis-item time { font-size: 10.5px; color: var(--muted); letter-spacing: .08em; margin-left: auto; text-transform: uppercase }
+.avis-item p { margin: 8px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--encre-2) }
+.avis-item img { margin-top: 10px; width: 150px; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 2px }
+.verif { font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--ok); border: 1px solid rgba(31, 107, 74, .3); padding: 2px 7px }
+.reponse { margin-top: 10px; padding: 10px 12px; background: var(--ivoire-2); font-size: 12.5px; color: var(--encre-2); border-left: 2px solid var(--bordeaux) }
+.verif-box summary { cursor: pointer; font-size: 12.5px; color: var(--bordeaux) }
+.photos-avis { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 18px }
+.photo-avis { margin: 0; width: 110px }
+.photo-avis img { width: 110px; height: 146px; object-fit: cover; border-radius: 2px; display: block }
+.photo-avis span, .photo-avis figcaption { display: block; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding-top: 6px }
+
+/* --- commandeur / paiement --- */
+.bloc-confirme { border: 1px solid var(--filet); border-left: 2px solid var(--or); background: var(--nacre) }
+/* Code de confirmation : gros, monospace, filet or — il faut pouvoir le dicter. */
+.code-conf { display: inline-flex; align-items: baseline; gap: 10px; margin: 12px 0 0; padding: 10px 14px; border: 1px solid var(--filet-2); border-left: 2px solid var(--or); background: var(--ivoire) }
+.code-conf .et { font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--poussiere) }
+.code-conf b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22px; letter-spacing: .16em; color: var(--encre) }
+.recap { display: grid; gap: 6px; margin: 14px auto 0; max-width: 380px; text-align: left }
+.recap div { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding-bottom: 6px; border-bottom: 1px dashed var(--filet) }
+.recap div:last-child { border-bottom: 0 }
+.recap .tot { font-weight: 600; color: var(--encre) }
+.bloc-note { border: 1px solid var(--filet); background: var(--nacre) }
+.confiance-note { background: transparent; border: 0; border-left: 2px solid var(--ok); padding-left: 12px; font-size: 12.5px; color: var(--encre-2) }
+.franchise { border-left-color: var(--or); background: var(--or-soft); color: var(--or-2); font-size: 12.5px }
+.alerte-box { border: 1px dashed rgba(147, 38, 28, .35); background: #fdf6f4 }
+.alerte-box .inp { height: 38px; width: 180px; padding: 0 10px }
+
+/* --- pages de contenu --- */
+.page { max-width: 760px; padding-top: 26px; padding-bottom: 60px }
+.page h1 { font-size: 30px; margin: 0 0 6px }
+.page h2 { font-size: 19px; margin: 26px 0 6px; padding-bottom: 8px; border-bottom: 1px solid var(--filet) }
+.page p { font-size: 14px; line-height: 1.68; color: var(--encre-2); margin: 8px 0 }
+.page ul { margin: 8px 0; padding-left: 18px; font-size: 14px; line-height: 1.7; color: var(--encre-2) }
+.acc h2 { cursor: default }
+.cadre-confiance { max-width: 620px; padding-top: 30px; padding-bottom: 60px }
+.cadre-confiance form { margin: 14px 0 6px }
+.fil-ariane { font-size: 11.5px; letter-spacing: .04em; color: var(--muted); padding: 14px 16px 0 }
+.fil-ariane a { color: var(--muted); text-decoration: none }
+.fil-ariane a:hover { color: var(--bordeaux) }
+.cta-fiche { display: grid; gap: 8px }
+.pied-ligne { margin-top: 10px }
+.pied-note { margin-top: 10px }
+.confiance { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); padding-top: 6px; padding-bottom: 34px }
+.confiance > div { border-top: 1px solid var(--filet); padding-top: 12px }
+.confiance b { display: block; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; margin-bottom: 6px }
+.confiance .small { color: var(--encre-2); line-height: 1.55 }
+
+/* --- installation (PWA) --- */
+.installer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: var(--encre); color: var(--ivoire); border-top: 1px solid rgba(184, 145, 47, .4); padding: 10px 0 }
+.installer .in { display: flex; align-items: center; gap: 14px; flex-wrap: wrap }
+.installer b { font-size: 13px; letter-spacing: .02em }
+.installer .small { color: #b9a7b1 }
+@media (max-width: 640px) {
+  .rang-lignes { gap: 14px; margin: 0 -16px; padding: 0 16px 10px }
+  .card.compact { width: 168px; flex: 0 0 168px }
+  .filtres-bar { gap: 14px; padding: 14px }
+  .avis-resume { grid-template-columns: 1fr; gap: 12px }
+  .photo-avis, .photo-avis img { width: 92px }
+  .photo-avis img { height: 122px }
+}

@@ -15,9 +15,10 @@ const PAGES = {
 };
 
 /* Une classe n'est « morte » que si aucun code du projet ne s'en sert. */
+/* Le rendu serveur fait partie du front : ses classes comptent comme utilisées. */
 const CODE = [
-  'public/js/app.js', 'public/js/api.js', 'public/index.html',
-  'admin-ui/admin.js', 'admin-ui/index.html',
+  'public/js/app.js', 'public/js/api.js', 'public/index.html', 'public/sw.js',
+  'admin-ui/admin.js', 'admin-ui/index.html', 'server/pages.js',
 ].map(LU).join('\n');
 
 let pb = 0;

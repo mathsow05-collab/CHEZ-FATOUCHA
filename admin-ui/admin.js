@@ -5,8 +5,14 @@
    paiement + statuts), zones de livraison, réglages.
    ============================================================ */
 const TOKEN_KEY = 'fatoucha_admin_token';
-const VUES = ['dash', 'commandes', 'produits', 'zones', 'reglages'];
-const S = { vue: 'dash', pret: false, commandes: { filtre: 'toutes', q: '' }, produits: { q: '', etat: 'tous' } };
+const VUES = ['dash', 'commandes', 'produits', 'avis', 'contenus', 'zones', 'reglages', 'entonnoir'];
+const S = {
+  vue: 'dash', pret: false,
+  commandes: { filtre: 'toutes', q: '' },
+  produits: { q: '', etat: 'tous' },
+  avis: { etat: 'en_attente' },
+  entonnoir: { jours: 30 },
+};
 const vueDuHash = () => (location.hash || '').replace(/^#\/?/, '').split('?')[0];
 const monogramme = () => (A.cfg?.nom_boutique || 'CHEZ FATOUCHA').replace(/[^\p{L}\s]/gu, ' ').split(/\s+/).filter(Boolean).slice(0, 2).map((m) => m[0]).join('').toUpperCase() || 'CF';
 let A = null; // conteneur racine (#adm-root)
@@ -47,7 +53,7 @@ async function aReq(method, url, body) {
 
 /* --------- coquille --------- */
 function coquille() {
-  const tabs = [['dash', '📊 Tableau de bord'], ['commandes', '📦 Commandes'], ['produits', '👗 Produits'], ['zones', '🚚 Zones & délais'], ['reglages', '⚙️ Réglages']];
+  const tabs = [['dash', '📊 Tableau de bord'], ['commandes', '📦 Commandes'], ['produits', '👗 Produits'], ['avis', '⭐ Avis'], ['contenus', '📄 Contenus'], ['zones', '🚚 Zones & délais'], ['reglages', '⚙️ Réglages'], ['entonnoir', '📈 Entonnoir']];
   return `
   <div class="adm-shell">
     <header class="adm-top"><div class="in">
@@ -80,6 +86,9 @@ async function dessiner() {
     if (S.vue === 'dash') await vueDash(body);
     else if (S.vue === 'commandes') await vueCommandes(body);
     else if (S.vue === 'produits') await vueProduits(body);
+    else if (S.vue === 'avis') await vueAvis(body);
+    else if (S.vue === 'contenus') await vueContenus(body);
+    else if (S.vue === 'entonnoir') await vueEntonnoir(body);
     else if (S.vue === 'zones') await vueZones(body);
     else if (S.vue === 'reglages') await vueReglages(body);
   } catch (e) {
@@ -269,6 +278,32 @@ async function formProduit(p) {
       <div class="small muted" style="margin-top:6px">Laisse vide si l’article n’a qu’une taille : le stock total est utilisé. Le stock total se recalcule tout seul à partir des variantes.</div>
     </div>
 
+    <div class="bloc" style="background:#fff">
+      <h3>🎬 Vidéo &amp; réassurance <span class="small muted" style="font-weight:400;text-transform:none;letter-spacing:0">— ce qui fait acheter en ligne</span></h3>
+      <div class="mini-form">
+        <div class="field full"><label>Vidéo de la pièce (MP4/WebM ou lien)</label>
+          <div class="row" style="gap:8px">
+            <input class="inp" id="f-video" value="${esc(data.video_url || '')}" placeholder="/uploads/produits/… .mp4  ou  https://…" />
+            <button class="btn sm ghost" id="f-topvideo" type="button">Téléverser</button>
+            <input type="file" id="f-videofile" accept="video/mp4,video/webm" class="hidden" />
+          </div>
+          <span class="small muted">10 secondes maximum, le tissu qui bouge. Laisse vide pour n'avoir que les photos.</span>
+        </div>
+        <div class="field full"><label>Message « portée par »</label>
+          <input class="inp" id="f-mannequin" value="${esc(data.mannequin || '')}" placeholder="Photo portée par Awa, 1,72 m, 58 kg — elle porte du S." />
+          <span class="small muted">Affiché sous les tailles : c'est ce qui réduit le plus les retours.</span>
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        <div class="row spread" style="align-items:baseline">
+          <span class="lbl" style="font-size:12px;font-weight:800;text-transform:uppercase;color:var(--muted)">Guide des tailles (centimètres)</span>
+          <button class="btn sm ghost" id="f-guidedup" type="button">Dupliquer la 1ʳᵉ ligne</button>
+        </div>
+        <div class="guide-grid" id="f-guide" style="margin-top:6px"></div>
+        <div class="small muted" style="margin-top:6px">Mesure à plat ×2 pour le tour. Laisse vide si l’article est « taille unique » — le lien « Guide des tailles » disparaît de la fiche.</div>
+      </div>
+    </div>
+
     <div class="row spread" style="flex-wrap:wrap">
       <button class="btn ghost" id="f-cancel">Annuler</button>
       <div class="row"><button class="btn gold big" id="f-save">${isEdit ? '💾 Enregistrer' : '➕ Créer l’article'}</button></div>
@@ -276,6 +311,34 @@ async function formProduit(p) {
   </div>`);
 
   const M = modal(isEdit ? 'Modifier un article' : 'Nouvel article', f, true);
+
+  /* Guide des tailles : une ligne par taille déclarée, valeurs conservées. */
+  const guide = { ...(data.guide_tailles && typeof data.guide_tailles === 'object' ? data.guide_tailles : {}) };
+  const COLS_GUIDE = [['poitrine', 'Poitrine'], ['taille', 'Taille'], ['hanches', 'Hanches'], ['longueur', 'Longueur']];
+  const dessineGuide = () => {
+    const box = f.querySelector('#f-guide');
+    const tl = f.querySelector('#f-tailles').value.split(',').map((x) => x.trim()).filter(Boolean);
+    if (!tl.length) { box.innerHTML = '<div class="small muted">Déclare d’abord des tailles (S, M, L…) pour saisir un guide.</div>'; return; }
+    box.innerHTML = '<span></span>' + COLS_GUIDE.map(([, l]) => `<span>${l}</span>`).join('')
+      + tl.map((t) => `<b class="gt">${esc(t)}</b>` + COLS_GUIDE.map(([k]) => `<input type="number" min="20" max="300" step="1" data-gt="${esc(t)}" data-gk="${k}" value="${guide[t]?.[k] ?? ''}" />`).join('')).join('');
+  };
+  f.querySelector('#f-tailles').addEventListener('change', dessineGuide);
+  f.querySelector('#f-guidedup').addEventListener('click', () => {
+    const inputs = [...f.querySelectorAll('#f-guide [data-gt]')];
+    if (inputs.length <= COLS_GUIDE.length) return toast('Ajoute au moins deux tailles à remplir.', 'ko');
+    COLS_GUIDE.forEach(([, ], i) => { inputs[inputs.length - i - 1].value = inputs[COLS_GUIDE.length - i - 1].value; });
+    return toast('Ligne recopiée — ajuste les centimètres.', 'ok');
+  });
+  const lisGuide = () => {
+    const out = {};
+    f.querySelectorAll('#f-guide [data-gt]').forEach((inp) => {
+      const v = Math.round(Number(inp.value) || 0);
+      if (v >= 20 && v <= 300) { out[inp.dataset.gt] = out[inp.dataset.gt] || {}; out[inp.dataset.gt][inp.dataset.gk] = v; }
+    });
+    return out;
+  };
+  dessineGuide();
+
   const imgs = data.images.map((i) => ({ url: i.url, legende: i.legende, is_main: i.is_main }));
   const drawImgs = () => {
     const box = f.querySelector('#f-imgs');
@@ -307,6 +370,25 @@ async function formProduit(p) {
   };
   files.addEventListener('change', () => envoi(files.files));
   drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('on'); envoi(e.dataTransfer.files); });
+
+  const videoFichier = f.querySelector('#f-videofile');
+  f.querySelector('#f-topvideo').addEventListener('click', () => videoFichier.click());
+  videoFichier.addEventListener('change', async () => {
+    const fu = videoFichier.files[0];
+    if (!fu) return;
+    const fd = new FormData();
+    fd.append('file', fu);
+    const btn = f.querySelector('#f-topvideo');
+    btn.disabled = true; btn.textContent = 'Envoi…';
+    try {
+      const r = await fetch('/api/admin/upload-video', { method: 'POST', headers: { Authorization: 'Bearer ' + localStorage.getItem(TOKEN_KEY) }, body: fd });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Envoi impossible.');
+      f.querySelector('#f-video').value = j.url;
+      toast('Vidéo ajoutée (' + Math.round((j.octets || 0) / 1024) + ' Ko) ✔', 'ok');
+    } catch (e2) { toast(e2.message, 'ko'); }
+    btn.disabled = false; btn.textContent = 'Téléverser';
+  });
 
   f.querySelector('#f-addurl').addEventListener('click', async (e) => {
     const u = f.querySelector('#f-imgurl').value.trim();
@@ -386,6 +468,9 @@ async function formProduit(p) {
       tailles: [...new Set(imgs.length ? f.querySelector('#f-tailles').value.split(',').map((x) => x.trim()).filter(Boolean) : [])],
       coloris: f.querySelector('#f-coloris').value.split(',').map((x) => x.trim()).filter(Boolean),
       variantes: (box._cells || []).map((c, i) => ({ taille: c.t, coloris: c.c, stock: Number(box.querySelector(`[data-vi="${i}"]`)?.value) || 0 })),
+      video_url: f.querySelector('#f-video').value.trim(),
+      mannequin: f.querySelector('#f-mannequin').value.trim(),
+      guide_tailles: lisGuide(),
     };
     try {
       if (isEdit) await aReq('PUT', '/api/admin/produits/' + prod.id, body);
@@ -396,6 +481,215 @@ async function formProduit(p) {
       btn.disabled = false; btn.textContent = isEdit ? '💾 Enregistrer' : '➕ Créer l’article';
     }
   });
+}
+
+/* --------- avis clients (modération) --------- */
+const ETOILES = (n) => '★★★★★'.slice(0, Math.max(0, Math.min(5, n))) + '☆☆☆☆☆'.slice(0, 5 - Math.max(0, Math.min(5, n)));
+
+async function vueAvis(body) {
+  const etat = S.avis.etat;
+  const rows = await aReq('GET', '/api/admin/avis?etat=' + encodeURIComponent(etat));
+  body.innerHTML = `
+  <div class="row spread" style="flex-wrap:wrap;gap:10px">
+    <div><h2 style="margin:0">Avis des clientes</h2>
+      <p class="small muted" style="margin:2px 0 0">Rien n’apparaît en ligne sans ton feu vert. Un avis avec photo et achat vérifié convertit mieux qu’un badge de paiement.</p></div>
+    <div class="row" style="gap:6px">
+      ${[['en_attente', 'À valider'], ['tous', 'Tous']].map(([k, l]) => `<button class="btn sm ${etat === k ? 'gold' : 'ghost'}" data-etat="${k}">${l}</button>`).join('')}
+    </div>
+  </div>
+  ${etat === 'en_attente' && rows.length ? `<div class="banner warn" style="margin-top:12px">${rows.length} avis en attente — publie-les vite, ils dorment sinon.</div>` : ''}
+  ${rows.length ? `<div class="avis-liste" style="margin-top:12px">${rows.map((a) => `
+    <article class="bloc avis-card">
+      <div class="row spread" style="gap:10px;flex-wrap:wrap">
+        <div><b>${esc(a.prenom || 'Anonyme')}</b> <span class="small muted">sur <a href="/produit/${esc(a.produit_slug || a.produit_id)}" target="_blank" rel="noopener">${esc(a.produit_titre || 'article #' + a.produit_id)}</a>${a.reference ? ` · commande <span class="mono">${esc(a.reference)}</span>` : ''}</span></div>
+        <div class="row" style="gap:8px;align-items:center">
+          <span class="avis-note" title="${a.note}/5">${ETOILES(a.note)}</span>
+          ${a.achat_verifie ? '<span class="tag-ok">achat vérifié</span>' : '<span class="tag-co">non vérifié</span>'}
+          ${a.approuve ? '<span class="tag-ok">en ligne</span>' : '<span class="tag-co">à valider</span>'}
+        </div>
+      </div>
+      ${a.texte ? `<p style="margin:8px 0 0">${esc(a.texte)}</p>` : ''}
+      <div class="small muted" style="margin-top:6px">${a.taille ? `Porte du ${esc(a.taille)} · ` : ''}${dateFr(a.created_at)}</div>
+      ${a.photo ? `<figure class="avis-photo"><img src="${esc(a.photo)}" alt="Photo envoyée par la cliente" loading="lazy" /></figure>` : ''}
+      ${a.reponse ? `<div class="avis-reponse"><b>Réponse de la boutique</b><p style="margin:4px 0 0">${esc(a.reponse)}</p></div>` : ''}
+      <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:10px">
+        ${a.approuve
+          ? `<button class="btn sm ghost" data-rej="${a.id}">Retirer de la page</button>`
+          : `<button class="btn sm gold" data-appr="${a.id}">Publier</button>`}
+        <button class="btn sm ghost" data-rep="${a.id}">${a.reponse ? 'Modifier la réponse' : 'Répondre'}</button>
+        <button class="btn sm ghost" data-edit="${a.id}">Corriger texte / note</button>
+        <button class="btn sm danger" data-del="${a.id}">Supprimer</button>
+      </div>
+    </article>`).join('')}</div>`
+    : `<div class="empty bloc" style="margin-top:12px"><div class="big">⭐</div>${etat === 'en_attente' ? 'Aucun avis en attente.' : 'Pas encore d’avis.'}<br><span class="small muted">Après une commande livrée, la cliente reçoit un lien « laisse un avis » (à envoyer depuis le détail de la commande).</span></div>`}
+  `;
+  body.querySelectorAll('[data-etat]').forEach((b) => b.addEventListener('click', () => { S.avis.etat = b.dataset.etat; dessiner(); }));
+  const maj = async (id, patch, msg) => {
+    try { await aReq('PATCH', '/api/admin/avis/' + id, patch); toast(msg, 'ok'); dessiner(); }
+    catch (e) { toast(e.message, 'ko'); }
+  };
+  body.querySelectorAll('[data-appr]').forEach((b) => b.addEventListener('click', () => maj(b.dataset.appr, { approuve: 1 }, 'Avis publié ✔')));
+  body.querySelectorAll('[data-rej]').forEach((b) => b.addEventListener('click', () => maj(b.dataset.rej, { approuve: 0 }, 'Avis retiré de la page.')));
+  body.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
+    if (!confirm('Supprimer définitivement cet avis ?')) return;
+    try { await aReq('DELETE', '/api/admin/avis/' + b.dataset.del); toast('Avis supprimé.', 'ok'); dessiner(); }
+    catch (e) { toast(e.message, 'ko'); }
+  }));
+  body.querySelectorAll('[data-rep]').forEach((b) => b.addEventListener('click', () => {
+    const a = rows.find((x) => String(x.id) === b.dataset.rep) || {};
+    const champ = A_el(`<div class="stack"><p class="small muted">Publiée sous l’avis, en clair. Une réponse honnête à un avis à 2 étoiles rassure plus que cinq avis à 5.</p>
+      <div class="field"><label>Réponse</label><textarea class="inp" id="av-r" rows="4">${esc(a.reponse || '')}</textarea></div>
+      <button class="btn gold block" id="av-save">Enregistrer la réponse</button></div>`);
+    const M = modal('Répondre à ‘' + (a.prenom || '') + '’', champ);
+    champ.querySelector('#av-save').addEventListener('click', async () => {
+      try { await aReq('PATCH', '/api/admin/avis/' + a.id, { reponse: champ.querySelector('#av-r').value.trim(), approuve: 1 }); M.close(); toast('Réponse envoyée ✔ (et avis publié)', 'ok'); dessiner(); }
+      catch (e) { toast(e.message, 'ko'); }
+    });
+  }));
+  body.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () => {
+    const a = rows.find((x) => String(x.id) === b.dataset.edit) || {};
+    const champ = A_el(`<div class="stack">
+      <div class="field"><label>Note</label><input class="inp" id="av-n" type="number" min="1" max="5" value="${a.note || 5}" /></div>
+      <div class="field"><label>Texte publié</label><textarea class="inp" id="av-t" rows="5">${esc(a.texte || '')}</textarea></div>
+      <button class="btn gold block" id="av-save">Corriger</button></div>`);
+    const M = modal('Corriger l’avis #' + a.id, champ);
+    champ.querySelector('#av-save').addEventListener('click', async () => {
+      try { await aReq('PATCH', '/api/admin/avis/' + a.id, { note: champ.querySelector('#av-n').value, texte: champ.querySelector('#av-t').value }); M.close(); toast('Avis corrigé ✔', 'ok'); dessiner(); }
+      catch (e) { toast(e.message, 'ko'); }
+    });
+  }));
+}
+
+/* --------- pages de contenu (FAQ, retours, livraison, maison) --------- */
+const PAGES_ADMIN = [
+  ['faq', 'Questions fréquentes', 'Chaque titre “## question” devient une question dépliable — et Google l’affiche dans les résultats.'],
+  ['retours', 'Retours & échanges', 'Écris-y les vrais délais : c’est la page que la cliente lit avant de payer.'],
+  ['livraison', 'Livraison', 'Quartiers, délais, tarif. Le reste est calculé par les zones.'],
+  ['a-propos', 'La maison', 'Ton histoire, ton quartier, comment tu choisis.'],
+];
+
+async function vueContenus(body) {
+  const rows = await aReq('GET', '/api/admin/pages');
+  const parSlug = {};
+  rows.forEach((r) => { parSlug[r.slug] = r; });
+  body.innerHTML = `
+  <div><h2 style="margin:0">Pages de contenu</h2>
+    <p class="small muted" style="margin:2px 0 0">Ces textes sont écrits par la boutique — ce sont eux qui répondent aux objections, pas les fiches produits. Format : du texte simple, des lignes <span class="mono">## Titre</span> pour les questions, <span class="mono">-</span> pour les listes.</p></div>
+  <div class="contenus" style="margin-top:14px">${PAGES_ADMIN.map(([slug, titre, aide]) => {
+    const pg = parSlug[slug];
+    return `<article class="bloc contenu-card">
+      <div class="row spread" style="flex-wrap:wrap;gap:8px">
+        <div><b>${esc(titre)}</b> <span class="small muted mono">/${slug}</span></div>
+        <div class="row" style="gap:6px">
+          <a class="btn sm ghost" href="/${slug}" target="_blank" rel="noopener">Voir en ligne</a>
+          <button class="btn sm gold" data-edite="${slug}">${pg ? 'Modifier' : 'Rédiger'}</button>
+        </div>
+      </div>
+      <p class="small muted" style="margin:6px 0 0">${esc(aide)}</p>
+      <div class="small" style="margin-top:8px">${pg ? `${(pg.corps || '').length} caractères · dernière écriture ${dateFr(pg.updated_at)}` : '<span class="tag-co">page vide</span>'}</div>
+    </article>`;
+  }).join('')}</div>`;
+  body.querySelectorAll('[data-edite]').forEach((b) => b.addEventListener('click', async () => {
+    const slug = b.dataset.edite;
+    const def = PAGES_ADMIN.find((x) => x[0] === slug) || [];
+    let pg = parSlug[slug] || null;
+    try { pg = await aReq('GET', '/api/admin/pages/' + slug) || pg; } catch { /* page encore vierge */ }
+    const champ = A_el(`<div class="stack">
+      <div class="field"><label>Titre de la page</label><input class="inp" id="c-t" value="${esc((pg && pg.titre) || def[1] || '')}" /></div>
+      <div class="field"><label>Phrase pour Google (meta description, ~155 caractères)</label><input class="inp" id="c-m" value="${esc((pg && pg.meta_desc) || '')}" /></div>
+      <div class="field"><label>Texte</label><textarea class="inp mono-block" id="c-c" rows="16" placeholder="## Quelle est la taille de ma robe ?&#10;Réponse en deux ou trois phrases.">${esc((pg && pg.corps) || '')}</textarea></div>
+      <div class="row" style="gap:8px">
+        <button class="btn ghost" id="c-x">Annuler</button>
+        <button class="btn gold big" id="c-ok" style="flex:1">Enregistrer la page</button>
+      </div></div>`);
+    const M = modal('Page /' + slug, champ, true);
+    champ.querySelector('#c-x').addEventListener('click', () => M.close());
+    champ.querySelector('#c-ok').addEventListener('click', async () => {
+      const btn = champ.querySelector('#c-ok');
+      btn.disabled = true; btn.textContent = 'Enregistrement…';
+      try {
+        await aReq('PUT', '/api/admin/pages/' + slug, {
+          titre: champ.querySelector('#c-t').value.trim(),
+          meta_desc: champ.querySelector('#c-m').value.trim(),
+          corps: champ.querySelector('#c-c').value,
+        });
+        M.close(); toast('Page enregistrée — visible tout de suite sur le site ✔', 'ok'); dessiner();
+      } catch (e) { btn.disabled = false; btn.textContent = 'Enregistrer la page'; toast(e.message, 'ko'); }
+    });
+  }));
+}
+
+/* --------- entonnoir de vente, paniers abandonnés, alertes de retour --------- */
+async function vueEntonnoir(body) {
+  const jours = S.entonnoir.jours;
+  const [d, paniers, alertes] = await Promise.all([
+    aReq('GET', '/api/admin/entonnoir?jours=' + jours),
+    aReq('GET', '/api/admin/paniers?jours=' + Math.min(30, jours)).catch(() => []),
+    aReq('GET', '/api/admin/alertes-stock').catch(() => []),
+  ]);
+  const max = Math.max(1, ...d.etapes.map((e) => e.n));
+  const aRelancer = paniers.filter((x) => x.telephone && !x.a_deja_commande);
+  body.innerHTML = `
+  <div class="row spread" style="flex-wrap:wrap;gap:10px">
+    <div><h2 style="margin:0">Entonnoir de vente</h2>
+      <p class="small muted" style="margin:2px 0 0">Ce que les visiteuses font, pas ce qu’on aimerait qu’elles fassent. Compteurs côté site, sans outil externe.</p></div>
+    <div class="row" style="gap:6px">${[7, 30, 90].map((j) => `<button class="btn sm ${jours === j ? 'gold' : 'ghost'}" data-jours="${j}">${j} j</button>`).join('')}</div>
+  </div>
+  <div class="kpis" style="margin-top:14px">
+    <div class="kpi"><b>${d.conversion_fiche_commande} %</b><span>Fiche → commande</span></div>
+    <div class="kpi"><b>${fcfa(Math.round(d.panier_moyen || 0))}</b><span>Panier moyen</span></div>
+    <div class="kpi"><b>${aRelancer.length}</b><span>Paniers à relancer</span></div>
+    <div class="kpi"><b>${alertes.filter((x) => !x.notifie_le).length}</b><span>Alertes de retour</span></div>
+  </div>
+  <div class="bloc" style="margin-top:14px">
+    <h3>Étapes</h3>
+    <div class="entonnoir">${d.etapes.map((e) => `
+      <div class="etape"><span class="nom">${esc(e.libelle)}</span>
+        <span class="bar"><i style="width:${Math.round((e.n / max) * 100)}%"></i></span>
+        <b class="n">${e.n}</b></div>`).join('')}</div>
+    <p class="small muted" style="margin:10px 0 0">Le trou entre « Commandes commencées » et « Commandes enregistrées », c’est le paiement qui coince : vérifie les numéros Wave/Orange Money dans ⚙️ Réglages.</p>
+  </div>
+  <div class="deux-colonnes" style="margin-top:14px">
+    <div class="bloc">
+      <h3>Les plus vues</h3>
+      ${d.top_vus.length ? `<table class="tbl"><tbody>${d.top_vus.map((x) => `<tr><td><a href="/produit/${esc(x.slug || x.id)}" target="_blank" rel="noopener">${esc(x.titre || 'article retiré')}</a></td><td style="text-align:right">${x.vues}</td></tr>`).join('')}</tbody></table>` : '<div class="small muted">Aucune vue enregistrée sur la période (le compte démarre quand le site est consulté).</div>'}
+    </div>
+    <div class="bloc">
+      <h3>Sans avis</h3>
+      ${d.sans_avis.length ? `<table class="tbl"><tbody>${d.sans_avis.map((x) => `<tr><td><a href="/produit/${esc(x.slug || x.id)}" target="_blank" rel="noopener">${esc(x.titre)}</a></td><td style="text-align:right" class="small muted">à relancer</td></tr>`).join('')}</tbody></table>` : '<div class="small muted">Toutes les pièces en stock ont au moins un avis publié.</div>'}
+    </div>
+  </div>
+  <div class="bloc" style="margin-top:14px">
+    <h3>Paniers laissés en route <span class="small muted" style="font-weight:400;text-transform:none;letter-spacing:0">— ${aRelancer.length} à relancer sur ${jours} jours</span></h3>
+    ${aRelancer.length ? `<table class="tbl"><thead><tr><th>Cliente</th><th>Articles</th><th>Total</th><th>Depuis</th><th></th></tr></thead><tbody>
+      ${aRelancer.slice(0, 12).map((x) => {
+        const msg = 'Salam' + (x.client ? ' ' + x.client.split(' ')[0] : '') + ' ! Ton panier chez Fatoucha est toujours dispo : ' + x.articles.join(', ') + ' (' + fcfa(x.total) + '). Je te le réserve ?';
+        return `<tr><td><b>${esc(x.client || 'sans nom')}</b><br><span class="small muted mono">${esc(x.telephone)}</span></td>
+          <td class="small">${esc(x.articles.join(' · '))}<br><span class="muted">${x.nb} article(s) · code reprise <span class="mono">${esc(x.code_reprise || '')}</span></span></td>
+          <td>${fcfa(x.total)}</td>
+          <td class="small muted">${dateFr(x.updated_at)}</td>
+          <td style="text-align:right"><a class="btn sm gold" target="_blank" rel="noopener" href="https://wa.me/${esc(String(x.telephone).replace(/\D/g, ''))}?text=${encodeURIComponent(msg)}">Relancer</a></td></tr>`;
+      }).join('')}</tbody></table>` : '<div class="small muted">Personne n’a laissé de panier avec un numéro sur la période — ou tout le monde a fini sa commande.</div>'}
+    <p class="small muted" style="margin:8px 0 0">Relance une seule fois, le lendemain avant 13h. Deux messages, c’est du harcèlement.</p>
+  </div>
+  <div class="bloc" style="margin-top:14px">
+    <h3>Retour en stock promis</h3>
+    ${alertes.length ? `<table class="tbl"><thead><tr><th>Article</th><th>Numéro</th><th>Demandé le</th><th>Stock</th><th></th></tr></thead><tbody>
+      ${alertes.slice(0, 20).map((x) => `<tr>
+        <td><a href="/produit/${esc(x.slug || x.produit_id)}" target="_blank" rel="noopener">${esc(x.titre)}</a></td>
+        <td class="mono small">${esc(x.telephone)}</td>
+        <td class="small muted">${dateFr(x.created_at)}</td>
+        <td>${x.stock > 0 ? '<span class="tag-ok">dispo</span>' : '<span class="tag-co">rupture</span>'}</td>
+        <td style="text-align:right;white-space:nowrap">
+          ${x.stock > 0 ? `<a class="btn sm gold" target="_blank" rel="noopener" href="https://wa.me/${esc(String(x.telephone).replace(/\D/g, ''))}?text=${encodeURIComponent('Bonne nouvelle : « ' + x.titre + ' » est de retour chez Fatoucha. Je te la mets de côté ?')}">Prévenir</a>` : ''}
+          ${x.notifie_le ? `<span class="small muted">prévenue ${dateFr(x.notifie_le)}</span>` : `<button class="btn sm ghost" data-notif="${x.id}">Marquer prévenu</button>`}
+        </td></tr>`).join('')}</tbody></table>` : '<div class="small muted">Aucune attente : personne n’a demandé à être prévenu d’un retour en stock.</div>'}
+  </div>`;
+  body.querySelectorAll('[data-jours]').forEach((b) => b.addEventListener('click', () => { S.entonnoir.jours = Number(b.dataset.jours); dessiner(); }));
+  body.querySelectorAll('[data-notif]').forEach((b) => b.addEventListener('click', async () => {
+    try { await aReq('POST', '/api/admin/alertes-stock/' + b.dataset.notif + '/notifie'); toast('Notée prévenue.', 'ok'); dessiner(); }
+    catch (e) { toast(e.message, 'ko'); }
+  }));
 }
 
 /* --------- commandes --------- */

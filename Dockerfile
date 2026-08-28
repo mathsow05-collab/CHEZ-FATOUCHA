@@ -7,8 +7,10 @@ FROM node:20-alpine
 
 WORKDIR /app
 ENV NODE_ENV=production
-# Outils de compilation, au cas où better-sqlite3 doit builder pour musl
-RUN apk add --no-cache python3 make g++ tzdata
+# Outils de compilation (better-sqlite3 pour musl) + libvips : c'est lui qui permet à
+# `sharp` de servir les photos en AVIF/WebP. Si le binaire précompilé de sharp suffit,
+# vips-dev reste inutilisé ; s'il manque, la compilation le trouve ici.
+RUN apk add --no-cache python3 make g++ tzdata vips-dev
 
 COPY package*.json ./
 RUN npm install --omit=dev --no-audit --no-fund

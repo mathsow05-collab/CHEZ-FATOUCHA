@@ -90,3 +90,29 @@ body.adm { background: var(--paper) }
 .var-grid .cell { display: grid; gap: 5px; padding: 10px; border: 1px solid var(--line); border-radius: 2px; background: var(--nacre); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted) }
 .var-grid .cell b { font-size: 12px; color: var(--ink); text-transform: none; letter-spacing: 0 }
 .var-grid input { width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 2px; font-size: 13px; background: var(--ivoire) }
+
+/* --------- avis, contenus, entonnoir --------- */
+.avis-liste { display: grid; gap: 12px }
+.avis-card { padding: 16px 18px }
+.avis-note { font-size: 13px; letter-spacing: .16em; color: var(--or) }
+.avis-photo { margin: 10px 0 0 }
+.avis-photo img { width: 130px; height: 173px; object-fit: cover; border: 1px solid var(--line) }
+.avis-reponse { margin-top: 10px; padding: 10px 12px; background: var(--ivoire); border-left: 2px solid var(--or); font-size: 13px }
+.avis-reponse b { font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted) }
+.tag-ok { display: inline-block; padding: 3px 8px; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; border: 1px solid var(--line); background: var(--nacre) }
+.tag-co { display: inline-block; padding: 3px 8px; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; border: 1px dashed var(--or); color: var(--or-2); background: var(--or-soft) }
+.contenus { display: grid; gap: 12px }
+.contenu-card { padding: 15px 18px }
+.mono-block { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; line-height: 1.6 }
+.entonnoir { display: grid; gap: 7px }
+.etape { display: grid; grid-template-columns: minmax(120px, 190px) 1fr auto; align-items: center; gap: 12px }
+.etape .nom { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted) }
+.etape .bar { position: relative; height: 24px; background: var(--ivoire-2); border: 1px solid var(--line) }
+.etape .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--encre) }
+.etape .n { font-family: var(--serif); font-size: 18px; font-weight: 400 }
+.deux-colonnes { display: grid; gap: 12px }
+@media (min-width: 900px) { .deux-colonnes { grid-template-columns: 1fr 1fr } }
+.guide-grid { display: grid; grid-template-columns: 76px repeat(4, 1fr); gap: 6px; align-items: center }
+.guide-grid span { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); text-align: center }
+.guide-grid .gt { font-size: 12px; font-weight: 700 }
+.guide-grid input { width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 2px; font-size: 13px; background: var(--ivoire) }

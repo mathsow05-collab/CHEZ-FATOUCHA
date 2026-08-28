@@ -79,24 +79,28 @@ const J = async (method, url, body, token) => {
       window.scrollTo = () => {};
     };
     const opts = { runScripts: 'dangerously', resources: 'usable', pretendToBeVisual: true, virtualConsole: vc };
-    dom = await JSDOM.fromURL(BASE + '/#/', { ...opts, beforeParse: (window) => { brancher(window); if (jetonAdmin) window.localStorage.setItem('fatoucha_admin_token', jetonAdmin); } });
+    dom = await JSDOM.fromURL(BASE + '/', { ...opts, beforeParse: (window) => { brancher(window); if (jetonAdmin) window.localStorage.setItem('fatoucha_admin_token', jetonAdmin); } });
     const w = dom.window;
     w.scrollTo = () => {};
+    /* la page est d'abord rendue par le serveur : on attend que le front ait pris la main */
+    await until(() => typeof w.go === 'function', { label: 'front hydrat (go() disponible)' });
     check('page chargée sans erreur JS', erreurs.length === 0, '\n     ' + erreurs.slice(0, 3).join('\n     '));
 
-    await until(() => w.document.querySelectorAll('.card').length > 0, { label: 'cartes produits' });
+    await until(() => w.document.querySelectorAll('#boutique-grid .card').length > 0, { label: 'cartes produits' });
     const d = w.document;
     check('hero + nom de la boutique affichés', /CHEZ FATOUCHA/.test(d.body.textContent));
     check('hero éditorial : sur-titre, visuel et monogramme « CF »', !!d.querySelector('.hero .sur') && !!d.querySelector('.hero .visuel img') && /^[A-Z]{2}$/.test(d.querySelector('.brand .logo').textContent.trim()), JSON.stringify(d.querySelector('.brand .logo')?.textContent));
     check('bandeau du haut sans emojis (registre sobre)', !/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(d.querySelector('.marquee').textContent), d.querySelector('.marquee').textContent.trim().slice(0, 40));
-    check('cartes produits rendues (= nb en base)', d.querySelectorAll('.card').length === (await (await fetch(BASE + '/api/produits')).json()).length, `(${d.querySelectorAll('.card').length})`);
+    check('cartes produits rendues (= nb en base)', d.querySelectorAll('#boutique-grid .card').length === (await (await fetch(BASE + '/api/produits')).json()).length, `(${d.querySelectorAll('#boutique-grid .card').length})`);
+    check('carte : image responsive (srcset /img + lazy) et lien propre', /srcset="\/img\/220/.test(d.querySelector('#boutique-grid .card').innerHTML) && /loading="lazy"/.test(d.querySelector('#boutique-grid .card').innerHTML) && /^\/produit\//.test(d.querySelector('#boutique-grid .card a').getAttribute('href')), d.querySelector('#boutique-grid .card a').getAttribute('href'));
+    check('catalogue : catégories et barre de filtres rendues', !!d.querySelector('#cats .cat') && !!d.querySelector('.filtres-bar'));
     check('prix en FCFA sur les cartes', /\d{1,3}\s?\d{3}\s?F/.test(d.querySelector('.card .price').textContent), d.querySelector('.card .price')?.textContent);
     check('délai estimé sur la carte', /~\d+ jour/.test(d.querySelector('.card .mini').textContent), d.querySelector('.card .mini')?.textContent);
     check('catégories affichées', d.querySelectorAll('.cat').length >= 7, `(${d.querySelectorAll('.cat').length})`);
     check('bandeau livraison + paiement', /Livraison/.test(d.querySelector('.marquee').textContent) && /Orange Money/.test(d.body.textContent));
 
     /* --- fiche produit : tailles, stock, quantités --- */
-    w.location.hash = '#/produit/1';
+    w.go('/produit/1');
     await until(() => d.getElementById('pd-qte'), { label: 'fiche produit' });
     check('boutons de taille rendus', prod1.tailles.length === 0 || d.querySelectorAll('[data-taille]').length === prod1.tailles.length, `(${d.querySelectorAll('[data-taille]').length})`);
     check('pastilles de coloris rendues', d.querySelectorAll('[data-coloris]').length === 2);
@@ -111,11 +115,53 @@ const J = async (method, url, body, token) => {
     for (let i = 0; i < 6; i++) { d.querySelector('[data-q="1"]').click(); await wait(30); }
     check('quantité plafonnée au stock de la variante', d.getElementById('pd-qte').textContent === String(Math.min(20, stockM)), d.getElementById('pd-qte').textContent + ' vs ' + stockM);
 
+    /* --- modules ajoutés sur la fiche : galerie, avis, guide, réassurance --- */
+    check('fiche : galerie avec vignettes et compteur de vues', d.querySelectorAll('.gallery .thumbs button').length >= 2 && /1 \/ \d+/.test(d.querySelector('.gal-compte')?.textContent || ''), `(${d.querySelectorAll('.gallery .thumbs button').length} vignettes)`);
+    check('fiche : srcset multi-largeurs sur la photo principale', /\/img\/220[\s\S]*\/img\/900/.test(d.getElementById('gal-main').getAttribute('srcset') || ''), d.getElementById('gal-main').getAttribute('srcset'));
+    const urlPhoto = d.getElementById('gal-main').getAttribute('src').split(' ')[0];
+    check('fiche : le serveur d’images répond en WebP (ou rédirige si SVG)', /(image\/(webp|avif|jpeg))/.test((await fetch(BASE + urlPhoto, { redirect: 'follow' })).headers.get('content-type') || ''), urlPhoto);
+    d.querySelector('.gallery .thumbs button[data-thumb="1"]').click();
+    await wait(120);
+    check('fiche : toucher une vignette change la photo principale', /media\/demo\/[a-z-]+-2\./.test(d.getElementById('gal-main').getAttribute('src') || ''), d.getElementById('gal-main').getAttribute('src'));
+    d.querySelector('[data-zoom]').click();
+    await until(() => d.querySelector('.loupe-cadre'), { label: 'loupe ouverte' });
+    check('fiche : la loupe s’ouvre avec navigation et légende', !!d.querySelector('.loupe-cadre img') && d.querySelectorAll('.loupe-nav').length === 2 && !!d.querySelector('.loupe-aide'));
+    d.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await wait(80);
+    check('fiche : Échap ferme la loupe', !d.querySelector('.loupe-cadre'));
+    check('fiche : liens guide des tailles et « trouver ma taille »', !!d.querySelector('[data-guide]') && !!d.querySelector('[data-trouve]'));
+    d.querySelector('[data-guide]').click();
+    await wait(80);
+    check('fiche : le tableau de mesures s’affiche', !!d.querySelector('table.guide') && /Poitrine|Hanches/.test(d.querySelector('table.guide').textContent), d.querySelector('table.guide')?.textContent.slice(0, 50));
+    d.querySelector('[data-trouve]').click();
+    await until(() => d.querySelector('#tt-out'), { label: 'calculateur de taille' });
+    d.querySelector('#tt-c [data-c="ample"]').click();
+    await wait(80);
+    check('fiche : le calculateur conseille une taille et propose de la choisir', /Conseil : <b>taille/.test(d.querySelector('#tt-out').innerHTML) && !!d.querySelector('#tt-out [data-choisir]'), d.querySelector('#tt-out').textContent.trim().slice(0, 70));
+    d.querySelectorAll('.modal').forEach((x) => x.remove());
+    await wait(60);
+    check('fiche : la mention « portée par » rassure sur la coupe', /portée par/i.test(d.querySelector('.puce-mannequin')?.textContent || ''), d.querySelector('.puce-mannequin')?.textContent);
+    check('fiche : rangée « dans le même esprit »', /même esprit/i.test(d.body.textContent) && d.querySelectorAll('.rang-lignes .card').length > 0, `(${d.querySelectorAll('.rang-lignes .card').length})`);
+    check('fiche : rangée « ça complète le look »', /complète le look/i.test(d.body.textContent));
+    check('fiche : bloc d’avis des acheteuses présent', !!d.querySelector('#avis') && /avis/i.test(d.querySelector('#avis h2').textContent), d.querySelector('#avis h2')?.textContent);
+    d.querySelector('#avis [data-avis]').click();
+    await until(() => d.getElementById('av-send'), { label: 'formulaire d’avis' });
+    const fm = d.getElementById('av-send').closest('.modal');
+    check('fiche : formulaire d’avis ouvert (note + prénom + texte + photo)', !!fm.querySelector('#av-note .chip') && !!fm.querySelector('#av-prenom') && !!fm.querySelector('#av-texte') && !!fm.querySelector('#av-photo'));
+    fm.querySelector('#av-note .chip[data-note="4"]').click();
+    fm.querySelector('#av-prenom').value = 'Awa T';
+    fm.querySelector('#av-texte').value = 'Tissu fluide, la taille est parfaite, je recommande.';
+    fm.querySelector('#av-send').click();
+    await until(() => /Merci/.test(d.getElementById('toast-root')?.textContent || ''), { label: 'avis envoyé' });
+    check('fiche : avis reçu, la boutique le publiera après vérification', /publie apr|vérification|en ligne/i.test(d.getElementById('toast-root').textContent), d.getElementById('toast-root').textContent.trim());
+    d.querySelectorAll('.modal').forEach((x) => x.remove());
+    await wait(60);
+
     /* --- panier --- */
     d.querySelector('[data-buy]').click();
     await wait(120);
     check('badge du panier mis à jour', d.querySelector('[data-cart-count]').textContent === String(Math.min(20, stockM)), d.querySelector('[data-cart-count]').textContent);
-    w.location.hash = '#/panier';
+    w.go('/panier');
     await until(() => d.querySelector('.cart-line'), { label: 'ligne de panier' });
     check('ligne de panier avec taille M', /M/.test(d.querySelector('.cart-line .vr').textContent), d.querySelector('.cart-line .vr').textContent);
     const qtePanier = Number(d.querySelector('[data-cart-count]').textContent);
@@ -130,7 +176,7 @@ const J = async (method, url, body, token) => {
 
     /* --- checkout : zone → frais → ETA --- */
     const qteFinale = Number(d.querySelector('[data-cart-count]').textContent);
-    w.location.hash = '#/commande';
+    w.go('/commande');
     await until(() => d.getElementById('f-zone'), { label: 'formulaire de commande' });
     d.getElementById('f-nom').value = 'Awa Diop';
     d.getElementById('f-tel').value = '77 123 45 67';
@@ -154,7 +200,7 @@ const J = async (method, url, body, token) => {
     d.getElementById('f-tel').value = '12';
     d.getElementById('btn-commande').click();
     await wait(250);
-    check('le front bloque un numéro invalide', d.getElementById('toast-root').children.length > 0 && !/paiement/.test(d.location.hash));
+    check('le front bloque un numéro invalide', d.getElementById('toast-root').children.length > 0 && !/paiement/.test(d.location.pathname));
     taper('f-tel', '77 123 45 67');
     if (process.env.DEBUG_SUBMIT) {
       const of_ = w.fetch;
@@ -167,13 +213,13 @@ const J = async (method, url, body, token) => {
     }
     d.getElementById('btn-commande').click();
     try {
-      await until(() => /#\/paiement\//.test(d.location.hash), { label: 'page de paiement', tries: process.env.DEBUG_SUBMIT ? 20 : 60 });
+      await until(() => /^\/paiement\//.test(d.location.pathname), { label: 'page de paiement', tries: process.env.DEBUG_SUBMIT ? 20 : 60 });
     } catch (e) {
-      console.log('   toasts:', d.getElementById('toast-root').textContent, '| hash:', d.location.hash);
+      console.log('   toasts:', d.getElementById('toast-root').textContent, '| url:', d.location.pathname + d.location.search);
       throw e;
     }
-    check('→ redirection vers la page de paiement', /#\/paiement\/CMD-/.test(d.location.hash), d.location.hash);
-    const ref = d.location.hash.split('/')[2];
+    check('→ redirection vers la page de paiement (vrai chemin, plus de #/)', /^\/paiement\/CMD-/.test(d.location.pathname), d.location.pathname);
+    const ref = d.location.pathname.split('/')[2];
 
     /* --- paiement manuel : numéro Wave + copie + preuve WhatsApp --- */
     await until(() => d.querySelector('.copy .num'), { label: 'bloc de paiement manuel' });
@@ -184,7 +230,7 @@ const J = async (method, url, body, token) => {
     check('référence rappelée dans le message WhatsApp', encodeURIComponent(ref).length > 0 && /CMD/.test(decodeURIComponent(d.querySelector('[href*="wa.me"]').href)));
 
     /* --- suivi client --- */
-    w.location.hash = '#/commande/' + ref + '?tel=771234567';
+    w.go('/commande/' + ref + '?tel=771234567');
     await until(() => d.querySelector('.tl'), { label: 'timeline de suivi' });
     check('suivi : timeline 5 étapes', d.querySelectorAll('.tl .st').length === 5);
     check('suivi : alerte paiement en attente', /en attente/i.test(d.body.textContent));
@@ -194,11 +240,10 @@ const J = async (method, url, body, token) => {
     check('boutique : aucun lien « Espace vendeur » dans l’écran', !/Espace vendeur/.test(d.body.textContent));
     check('boutique : aucun lien, même caché, vers le back-office', !d.querySelector('a[href*="admin"]'));
     check('boutique : le HTML reçu ne contient ni chrome ni code du back-office', !/adm-root|adm-tabs|adm-login/.test(d.documentElement.outerHTML));
-    w.location.hash = '#/admin';
-    await wait(250);
-    check('ancienne route #/admin : la boutique s’affiche, jamais le back-office', d.querySelectorAll('.card').length > 0 && !d.querySelector('.adm-tabs'));
-    w.location.hash = '#/';
-    await until(() => d.querySelectorAll('.card').length > 0, { label: 'retour catalogue' });
+    check('le routeur client ne connaît pas /admin (back-office = page séparée)', w.eval('ROUTES_SPA.test("/admin")') === false && w.eval('ROUTES_SPA.test("/panier")') === true);
+    check('la boutique ne contient aucune classe du back-office', !/adm-shell|adm-tabs|adm-login/.test(d.getElementById('app').innerHTML));
+    w.go('/');
+    await until(() => d.querySelectorAll('#boutique-grid .card').length > 0, { label: 'retour catalogue' });
 
     /* --- espace vendeur : page séparée /admin, ouverte dans sa propre fenêtre --- */
     domAdm = await JSDOM.fromURL(BASE + '/admin#produits', { ...opts, beforeParse: (window) => { brancher(window); window.localStorage.setItem('fatoucha_admin_token', jetonAdmin); } });
@@ -243,6 +288,72 @@ const J = async (method, url, body, token) => {
     w.location.hash = '#/commande/' + ref + '?tel=771234567';
     await until(() => /Payement valid|Paiement validé/.test(d.body.textContent), { label: 'suivi mis à jour' });
     check('suivi client : paiement validé visible', /Paiement validé/.test(d.body.textContent));
+
+    /* --- reprise de panier : le code est donné au client, pas seulement au serveur --- */
+    w.go('/panier');
+    await until(() => d.querySelector('[data-reprise]'), { label: 'bouton de reprise' });
+    check('panier : le panier est copié côté serveur avec un code de reprise', !!w.localStorage.getItem('fatoucha_panier_code') && /Retrouver un panier/.test(d.body.textContent), w.localStorage.getItem('fatoucha_panier_code'));
+
+    /* --- suivi : la cliente doit pouvoir confirmer sa présence avant départ --- */
+    w.go('/commande/' + ref + '?tel=771234567');
+    await until(() => d.querySelector('.tl'), { label: 'suivi' });
+    check('suivi : lien vers la page de confirmation (le livreur ne part pas pour rien)', /\/confirmer\//.test(d.getElementById('app').innerHTML), '');
+
+    /* --- PWA : manifeste + service worker --- */
+    check('manifeste d’installation lié et servi', /rel="manifest"/.test(d.querySelector('head').innerHTML) && (await fetch(BASE + '/manifest.webmanifest')).ok);
+    check('service worker servi', (await fetch(BASE + '/sw.js')).ok);
+
+    /* --- espace vendeur : les trois nouveaux onglets --- */
+    da.querySelector('[data-tab="avis"]').click();
+    await until(() => /Avis des clientes/.test(da.querySelector('#admin-body')?.textContent || ''), { label: 'onglet avis' });
+    check('admin : l’avis envoyé par la cliente est là à valider', /Awa T/.test(da.querySelector('#admin-body').textContent), da.querySelector('#admin-body').textContent.slice(0, 140));
+    const publier = da.querySelector('[data-appr]');
+    check('admin : publier / répondre / corriger / supprimer disponibles', !!publier && !!da.querySelector('[data-rep]') && !!da.querySelector('[data-edit]') && !!da.querySelector('[data-del]'));
+    da.querySelector('[data-rep]').click();
+    await until(() => da.getElementById('av-r'), { label: 'champ de réponse' });
+    da.getElementById('av-r').value = 'Merci Awa ! Le même tissu ressort en bleu nuit la semaine prochaine.';
+    da.getElementById('av-save').click();
+    await wait(300);
+    da.querySelector('[data-etat="tous"]').click();
+    await until(() => /Réponse de la boutique/.test(da.querySelector('#admin-body')?.textContent || ''), { label: 'réponse visible dans « Tous »' });
+    check('admin : réponse publiée sous l’avis (et avis validé du même coup)', /Merci Awa/.test(da.querySelector('#admin-body').textContent) && /en ligne/.test(da.querySelector('#admin-body').textContent));
+    da.querySelector('[data-etat="en_attente"]').click();
+    await until(() => /Aucun avis en attente/.test(da.querySelector('#admin-body')?.textContent || ''), { label: 'file de modération vidée' });
+    check('admin : la file « à valider » est vide, l’avis est passé en ligne', /Aucun avis en attente/.test(da.querySelector('#admin-body').textContent));
+    /* l’avis est visible côté cliente, avec sa note */
+    w.go('/produit/1');
+    await until(() => /Awa T/.test(d.querySelector('#avis')?.textContent || ''), { label: 'avis publié visible côté cliente' });
+    check('fiche : l’avis publié (et la réponse de la boutique) s’affiche à la cliente', /Awa T/.test(d.querySelector('#avis').textContent) && /Merci Awa/.test(d.querySelector('#avis').textContent), d.querySelector('#avis').textContent.slice(0, 160));
+    check('fiche : note moyenne reprise dans l’en-tête du bloc avis', /4\/5|\b4\b/.test(d.querySelector('#avis').textContent), d.querySelector('#avis h2')?.textContent);
+    da.querySelector('[data-tab="contenus"]').click();
+    await until(() => /Pages de contenu/.test(da.querySelector('#admin-body')?.textContent || ''), { label: 'onglet contenus' });
+    check('admin : quatre pages éditables (FAQ, retours, livraison, maison)', da.querySelectorAll('.contenu-card').length === 4, `(${da.querySelectorAll('.contenu-card').length})`);
+    da.querySelector('[data-edite="faq"]').click();
+    await until(() => da.getElementById('c-c'), { label: 'éditeur de page' });
+    check('admin : l’éditeur de FAQ contient le texte existant', (da.getElementById('c-c').value || '').length > 120, `${(da.getElementById('c-c').value || '').length} caractères`);
+    da.getElementById('c-x').click();
+    da.querySelector('[data-tab="entonnoir"]').click();
+    await until(() => /Entonnoir de vente/.test(da.querySelector('#admin-body')?.textContent || ''), { label: 'onglet entonnoir' });
+    check('admin : entonnoir à six étapes dessinées', da.querySelectorAll('.entonnoir .etape').length === 6, `(${da.querySelectorAll('.entonnoir .etape').length})`);
+    check('admin : les visites de la cliente sont bien comptées', Number(da.querySelector('.entonnoir .etape .n')?.textContent) > 0, da.querySelector('.entonnoir .etape')?.textContent);
+    check('admin : KPI panier moyen + relances (paniers et alertes de retour)', /Panier moyen/.test(da.querySelector('#admin-body').textContent) && /Paniers laissés en route/.test(da.querySelector('#admin-body').textContent) && /Retour en stock promis/.test(da.querySelector('#admin-body').textContent));
+    da.querySelector('[data-tab="produits"]').click();
+    await until(() => da.querySelectorAll('[data-edit]').length > 0, { label: 'retour produits' });
+    /* on ouvre la robe bohème : c'est elle qui a un guide et une ligne « portée par » */
+    const ligneRobe = [...da.querySelectorAll('[data-edit]')].find((b) => /Robe longue/.test(b.closest('tr').textContent));
+    check('admin : la liste des articles montre les vues et le stock', /\d+ vus|\d+ vus/.test(da.querySelector('#admin-body').textContent) || /Robe longue/.test(da.querySelector('#admin-body').textContent));
+    ligneRobe.click();
+    await until(() => da.getElementById('f-video'), { label: 'formulaire produit rouvert' });
+    check('admin : la fiche article expose vidéo, réassurance et guide des tailles', !!da.getElementById('f-mannequin') && da.querySelectorAll('#f-guide [data-gt]').length >= 12, `(${da.querySelectorAll('#f-guide [data-gt]').length} champs de mesure)`);
+    check('admin : le guide déjà enregistré est rechargé dans le formulaire', [...da.querySelectorAll('#f-guide input')].some((x) => Number(x.value) >= 60), [...da.querySelectorAll('#f-guide input')].slice(0, 4).map((x) => x.value).join('/'));
+    check('admin : la ligne « portée par » est réécritable', /portée par/i.test(da.getElementById('f-mannequin').value), da.getElementById('f-mannequin').value);
+    /* on complète le guide depuis l’admin, la fiche cliente doit le montrer aussitôt */
+    da.getElementById('f-mannequin').value = 'Photo portée par Awa, 1,72 m, 58 kg — elle porte du S.';
+    da.getElementById('f-save').click();
+    await until(() => /mis à jour/.test(da.getElementById('toast-root')?.textContent || ''), { label: 'enregistrement de la fiche' });
+    w.go('/produit/1');
+    await until(() => /portée par/i.test(d.querySelector('.puce-mannequin')?.textContent || ''), { label: 'fiche cliente rafraîchie' });
+    check('admin → cliente : la réassurance saisie dans le back-office est en ligne', /portée par/i.test(d.querySelector('.puce-mannequin').textContent), d.querySelector('.puce-mannequin').textContent);
 
     check('aucune erreur JS pendant tout le parcours', erreurs.length === 0, '\n     ' + erreurs.slice(0, 4).join('\n     '));
   } catch (e) {

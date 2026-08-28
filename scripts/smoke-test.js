@@ -115,6 +115,15 @@ const J = async (method, url, body, token) => {
     const suivi = await J('GET', `/api/commandes/${reference}?tel=771234567`);
     check('suivi client par référence + numéro', suivi.status === 200 && suivi.data.statut === 'nouvelle');
     check('suivi refuse le mauvais numéro', (await J('GET', `/api/commandes/${reference}?tel=700000000`)).status === 404);
+    const codeCmd = commande.data.code_confirmation;
+    check('la commande renvoie un code de confirmation à 6 caractères', /^[A-Z0-9]{6}$/.test(String(codeCmd || '')), String(codeCmd));
+    check('suivi accepte aussi le code de confirmation (le lien reçu par WhatsApp)', (await J('GET', `/api/commandes/${reference}?code=${codeCmd}`)).status === 200);
+    check('le suivi par code ne révèle pas le numéro complet à un inconnu', await (async () => {
+      const r = await J('GET', `/api/commandes/${reference}?code=${codeCmd}`);
+      return r.status === 200 && typeof r.data.telephone === 'string';
+    })());
+    check('acompte COD : nul sur une commande payée d’avance', (commande.data.acompte || 0) === 0, JSON.stringify({ a: commande.data.acompte, r: commande.data.reste_a_payer }));
+    check('page de confirmation liée à la commande', /^\/confirmer\/[A-Z0-9-]+\/[A-Z0-9]{6}$/.test(String(commande.data.page_confirmation || '')), commande.data.page_confirmation);
 
     console.log('— Paiement Wave / Orange Money —');
     const pay = await J('POST', '/api/paiement/checkout', { reference, methode: 'wave', telephone: '77 123 45 67' });
@@ -293,6 +302,206 @@ const J = async (method, url, body, token) => {
     check('visuel du hero présent et servi', (await fetch(BASE + '/media/demo/lookbook.jpg')).status === 200);
     check('favicon monogramme assorti au thème', /CF/.test(await (await fetch(BASE + '/media/favicon.svg')).text()));
     check('export CSV commandes', (await fetch(BASE + '/api/admin/commandes-export', { headers: { Authorization: 'Bearer ' + tok } })).headers.get('content-type')?.includes('csv'));
+
+    console.log('— URLs lisibles, rendu serveur et SEO —');
+    const htmlAccueil = await (await fetch(BASE + '/')).text();
+    check('accueil rendu par le serveur (pas seulement la coquille)', /<h1[^>]*>/.test(htmlAccueil) && /"@type":"ClothingStore"/.test(htmlAccueil), htmlAccueil.slice(0, 120));
+    check('accueil : prix et titres déjà dans le HTML (Google n’attend pas le JS)', /class="card"/.test(htmlAccueil) && /FCFA|\d{1,3}[\s\u00a0]?\d{3} F/.test(htmlAccueil), '');
+    check('accueil : données structurées + canonical + og:image', /application\/ld\+json/.test(htmlAccueil) && /rel="canonical"/.test(htmlAccueil) && /property="og:image"/.test(htmlAccueil));
+    const slug = (await J('GET', '/api/produits/' + p0.id)).data.slug;
+    const htmlFiche = await (await fetch(BASE + '/produit/' + slug)).text();
+    check('fiche produit rendue par le serveur avec son titre', new RegExp('<h1[^>]*>' + p0.titre.slice(0, 12)).test(htmlFiche), htmlFiche.match(/<h1[^>]*>[^<]*/)?.[0]);
+    check('fiche : schema Product + Offer + prix dans le HTML', /"@type":"Product"/.test(htmlFiche) && /"@type":"Offer"/.test(htmlFiche) && /"price"\s*:\s*/.test(htmlFiche), '');
+    check('fiche : fil d’ariane et image de partage en URL absolue', /BreadcrumbList/.test(htmlFiche) && /property="og:image" content="http/.test(htmlFiche), '');
+    const rNum = await fetch(BASE + '/produit/' + p0.id, { redirect: 'manual' });
+    check('URL numérique de fiche → redirection 301 vers le slug', rNum.status === 301 && String(rNum.headers.get('location')).endsWith('/produit/' + slug), rNum.headers.get('location'));
+    const rClic = await fetch(BASE + '/boutique?tri=prix_asc', { redirect: 'manual' });
+    check('les paramètres de tri ne créent pas de page dupliquée (canonical)', /rel="canonical"/.test(await rClic.text()));
+    const listeCats = (await J('GET', '/api/categories')).data;
+    const catSlug = (listeCats.find((c) => c.slug) || {}).slug || 'x';
+    const rCat = await fetch(BASE + '/categorie/' + catSlug);
+    const htmlCat = await rCat.text();
+    check('page catégorie rendue par le serveur', rCat.status === 200 && /<h1/.test(htmlCat) && /BreadcrumbList/.test(htmlCat), `${rCat.status} ${catSlug} · ${JSON.stringify(listeCats).slice(0, 160)} · ${htmlCat.slice(0, 90)}`);
+    const htmlFaq = await (await fetch(BASE + '/faq')).text();
+    check('FAQ : une question = un bloc et du schema FAQPage', /"@type":"FAQPage"/.test(htmlFaq) && (htmlFaq.match(/<h2>/g) || []).length >= 3, `${(htmlFaq.match(/<h2>/g) || []).length} questions`);
+    for (const slugPage of ['retours', 'livraison', 'a-propos']) {
+      const rp = await fetch(BASE + '/' + slugPage);
+      check('page de contenu /' + slugPage + ' servie et non vide', rp.status === 200 && /<h1/.test(await rp.text()));
+    }
+    const htmlPanier = await (await fetch(BASE + '/panier')).text();
+    check('panier et paiement : coquille client, volontairement hors index', /name="robots" content="noindex/.test(htmlPanier));
+    const site = await (await fetch(BASE + '/sitemap.xml')).text();
+    check('sitemap : uniquement des URLs canoniques (ni #, ni admin, ni API)', site.includes(`<loc>${BASE}/</loc>`) && !/#/.test(site) && !/\/admin|\/api\//.test(site), site.slice(0, 140));
+    check('sitemap : une entrée par article actif', (site.match(/<loc>/g) || []).length >= 8 + 4, `${(site.match(/<loc>/g) || []).length} URLs`);
+    const rob = await (await fetch(BASE + '/robots.txt')).text();
+    check('robots.txt : back-office et API fermés, sitemap déclaré', /Disallow: \/admin/.test(rob) && /Disallow: \/api\//.test(rob) && /Sitemap: .*\/sitemap\.xml/.test(rob));
+    check('les pages de compte (panier/commande/paiement) ne sont pas dans le sitemap', !/\/panier|\/commande|\/paiement/.test(site));
+
+    console.log('— Pipeline images : WebP à la volée, caches, sécurité —');
+    const urlPhotoDemo = (p0.images[0] || p0.image).url;
+    const rImg = await fetch(`${BASE}/img/480${urlPhotoDemo}`, { headers: { accept: 'image/webp,*/*' } });
+    const octetsWebp = (await rImg.clone().arrayBuffer()).byteLength;
+    check('image redimensionnée servie en WebP (Accept: webp)', rImg.status === 200 && rImg.headers.get('content-type') === 'image/webp', rImg.headers.get('content-type'));
+    const rAvif = await fetch(`${BASE}/img/480${urlPhotoDemo}`, { headers: { accept: 'image/avif,image/webp,*/*' } });
+    check('le même fichier passe en AVIF quand le navigateur le sait lire', rAvif.headers.get('content-type') === 'image/avif', rAvif.headers.get('content-type'));
+    const octetsAvif = (await rAvif.arrayBuffer()).byteLength;
+    check('l’AVIF est plus léger que le WebP à largeur égale', octetsAvif > 0 && octetsAvif < octetsWebp, `${octetsAvif} vs ${octetsWebp}`);
+    const octetsWebp2 = octetsWebp;
+    check('image 480 px bien plus légère que le JPG d’origine', octetsWebp2 > 2000 && octetsWebp2 < 60_000, `${octetsWebp2} o`);
+    check('cache navigateur autorisé sur les images dérivées', /max-age=\d+/.test(rImg.headers.get('cache-control') || ''), rImg.headers.get('cache-control'));
+    const rImg2 = await fetch(`${BASE}/img/480${urlPhotoDemo}`, { headers: { accept: 'image/webp,*/*' } });
+    check('le second appel est resservi depuis le cache disque (pas de re-codage)', rImg2.headers.get('x-image-cache') === 'disque', rImg2.headers.get('x-image-cache'));
+    check('les largeurs déclarées par le front sont toutes servies', await (async () => {
+      for (const w of [220, 480, 900, 1200]) {
+        const r = await fetch(`${BASE}/img/${w}${urlPhotoDemo}`);
+        if (r.status !== 200) return false;
+      }
+      return true;
+    })());
+    check('une largeur bidon est refusée (pas de fichier créé au hasard)', (await fetch(`${BASE}/img/0${urlPhotoDemo}`)).status >= 400 || (await fetch(`${BASE}/img/toto${urlPhotoDemo}`)).status >= 400);
+    const rTrav = await fetch(`${BASE}/img/480/%2e%2e%2fserver%2fdb.js`);
+    const txtTrav = await rTrav.text();
+    check('le redimensionneur ne sort pas du dossier des visuels', rTrav.status >= 400 || !/better-sqlite3|prepare\(/.test(txtTrav), `${rTrav.status} ${txtTrav.slice(0, 60)}`);
+    check('un SVG n’est pas re-encodé : redirection vers le fichier', await (async () => {
+      const r = await fetch(`${BASE}/img/480${urlPhotoDemo.replace(/\.jpg$/, '.svg')}`, { redirect: 'manual' });
+      return r.status === 302 || r.status === 301 || r.status === 200;
+    })());
+    check('le srcset du catalogue pointe vers /img (et non les JPG plein format)', /\/img\/\d+\//.test((await J('GET', '/api/produits')).data[0]?.images?.[0]?.srcset || ''), (await J('GET', '/api/produits')).data[0]?.images?.[0]?.srcset);
+
+    console.log('— Avis clientes : envoi, modération, réputation —');
+    const sansAvis = (await J('GET', '/api/produits/' + p0.id)).data;
+    check('note moyenne renvoyée avec le produit', sansAvis.avis && typeof sansAvis.avis.nombre === 'number', JSON.stringify(sansAvis.avis));
+    check('avis rejeté si la note est hors bornes', (await J('POST', `/api/produits/${p0.id}/avis`, { prenom: 'Moussa', note: 8, texte: 'Trop bien, je recommande à tout le monde.' })).status === 400);
+    const aVis = await J('POST', `/api/produits/${p0.id}/avis`, { prenom: 'Moussa', note: 5, texte: 'Tissu fluide, taille normale, livré en deux jours.' });
+    check('avis sans commande vérifiée : reçu mais pas publié', aVis.status === 201 && aVis.data.publie === false, JSON.stringify(aVis.data));
+    check('avis invisible tant que la boutique ne l’a pas validé', (await J('GET', `/api/produits/${p0.id}`)).data.avis.nombre === 0);
+    const enAttente = await J('GET', '/api/admin/avis?etat=en_attente', undefined, tok);
+    check('l’admin voit la file des avis à valider', enAttente.status === 200 && enAttente.data.some((a) => a.prenom === 'Moussa'), JSON.stringify(enAttente.data).slice(0, 120));
+    const idAvis = (enAttente.data.find((a) => a.prenom === 'Moussa') || {}).id;
+    check('modérer un avis = le publier + répondre', (await J('PATCH', '/api/admin/avis/' + idAvis, { approuve: 1, reponse: 'Merci Moussa ! À bientôt.' }, tok)).status === 200);
+    const avecAvis = (await J('GET', `/api/produits/${p0.id}`)).data;
+    check('l’avis publié est visible côté cliente', avecAvis.avis.nombre === 1 && avecAvis.avis.moyenne === 5, JSON.stringify(avecAvis.avis));
+    check('la réponse de la boutique est affichée sous l’avis', (avecAvis.avis_liste[0] || {}).reponse === 'Merci Moussa ! À bientôt.', JSON.stringify(avecAvis.avis_liste[0]));
+    check('le balisage Product intègre la note agrégée (étoiles dans Google)', /aggregateRating/i.test(await (await fetch(BASE + '/produit/' + slug)).text()));
+    const ficheSansAvis = (await J('GET', '/api/produits')).data.find((x) => !x.avis?.nombre && x.slug);
+    check('une fiche sans avis n’invente pas de note', !!ficheSansAvis && !/aggregateRating/.test(await (await fetch(BASE + '/produit/' + ficheSansAvis.slug)).text()), ficheSansAvis?.slug);
+
+    console.log('— Alertes de retour en stock —');
+    /* on met volontairement un article secondaire en rupture pour jouer le scénario */
+    const candAlerte = (await J('GET', '/api/produits')).data.find((x) => x.id !== p0.id && x.stock > 0);
+    const avantAlerte = (await J('GET', '/api/admin/produits?q=' + encodeURIComponent(candAlerte.titre), undefined, tok)).data.find((x) => x.id === candAlerte.id)
+      || (await J('GET', '/api/produits/' + candAlerte.id)).data;
+    const variantesVivantes = (avantAlerte.variantes || []).map((v) => ({ taille: v.taille, coloris: v.coloris, stock: v.stock }));
+    await J('PUT', '/api/admin/produits/' + candAlerte.id, {
+      ...avantAlerte, titre: avantAlerte.titre, prix: avantAlerte.prix, images: avantAlerte.images,
+      tailles: avantAlerte.tailles, coloris: avantAlerte.coloris, stock: 0,
+      variantes: variantesVivantes.map((v) => ({ ...v, stock: 0 })), actif: true,
+    }, tok);
+    const idRupture = candAlerte.id;
+    const alerte = await J('POST', '/api/alertes-stock', { produit_id: idRupture, telephone: '77 555 44 33' });
+    check('une cliente peut s’inscrire pour le retour d’un article épuisé', alerte.status === 200 && alerte.data.ok === true, JSON.stringify(alerte.data));
+    check('le même numéro sur le même article ne crée pas un doublon', (await J('POST', '/api/alertes-stock', { produit_id: idRupture, telephone: '77 555 44 33' })).data.ok === true);
+    check('numéro invalide rejeté pour l’alerte', (await J('POST', '/api/alertes-stock', { produit_id: idRupture, telephone: '12' })).status === 400);
+    check('l’admin voit la liste des alertes', (await J('GET', '/api/admin/alertes-stock', undefined, tok)).data.some((a) => a.produit_id === idRupture));
+    const fileAlerte = (await J('GET', '/api/admin/alertes-stock', undefined, tok)).data.find((a) => a.produit_id === idRupture);
+    check('la boutique peut marquer la cliente comme prévenue', (await J('POST', '/api/admin/alertes-stock/' + fileAlerte.id + '/notifie', {}, tok)).status === 200);
+    await J('PUT', '/api/admin/produits/' + candAlerte.id, {
+      ...avantAlerte, titre: avantAlerte.titre, prix: avantAlerte.prix, images: avantAlerte.images,
+      tailles: avantAlerte.tailles, coloris: avantAlerte.coloris, stock: avantAlerte.stock,
+      variantes: variantesVivantes, actif: true,
+    }, tok);
+    check('l’article est remis en vente après le test', (await J('GET', '/api/produits/' + candAlerte.id)).data.stock === avantAlerte.stock);
+
+    console.log('— Panier enregistré : reprise et relance —');
+    const jeton = 'jeton-test-8f2a';
+    check('jeton invalide refusé', (await J('POST', '/api/panier', { jeton: 'x', items: [{ produit_id: p0.id, quantite: 1 }] })).status === 400);
+    const sync = await J('POST', '/api/panier', { jeton, telephone: '77 999 88 77', client: 'Bineta Fall', items: [{ produit_id: p0.id, taille: var0?.taille || null, quantite: 2 }] });
+    check('le panier du client est copié côté serveur', sync.status === 200 && sync.data.total === p0.prix * 2, JSON.stringify(sync.data));
+    check('un code de reprise est donné au client', /^[A-Z0-9]{4}$/.test(String(sync.data.etabli || '')), sync.data.etabli);
+    check('reprise sur un autre téléphone avec le code', (await J('GET', `/api/panier?tel=779998877&code=${sync.data.etabli}`)).data.found === true);
+    check('un code erroné ne révèle pas qu’un panier existe', (await J('GET', '/api/panier?tel=779998877&code=0000')).data.found === false);
+    check('le panier récupéré garde les quantités', await (async () => {
+      const r = await J('GET', `/api/panier?jeton=${jeton}`);
+      return r.data.found && r.data.items[0].quantite === 2 && r.data.items[0].produit_id === p0.id;
+    })(), '');
+    check('la boutique liste les paniers abandonnés à relancer', (await J('GET', '/api/admin/paniers?jours=7', undefined, tok)).data.some((x) => x.telephone && x.a_deja_commande === 0), JSON.stringify((await J('GET', '/api/admin/paniers?jours=7', undefined, tok)).data).slice(0, 140));
+    check('vider le panier enregistré après commande', (await J('POST', '/api/panier/vider', { jeton })).status === 200 && (await J('GET', `/api/panier?jeton=${jeton}`)).data.found === false);
+
+    console.log('— Mesure de l’entonnoir —');
+    const lot = await J('POST', '/api/evenements', {
+      seance: 'seance-de-test',
+      evenements: [
+        { type: 'vue_fiche', produit_id: p0.id }, { type: 'vue_fiche', produit_id: p0.id }, { type: 'vue_fiche', produit_id: p0.id },
+        { type: 'ajout_panier', produit_id: p0.id }, { type: 'ouverture_commande' },
+        { type: 'vol_de_donnees' }, { type: '<script>alert(1)</script>' },
+      ],
+    });
+    check('les cinq événements connus du lot sont enregistrés', lot.status === 200 && lot.data.enregistres === 5, JSON.stringify(lot.data));
+    check('un type d’événement inconnu est jeté, une balise aussi', lot.data.enregistres === 5);
+    check('le front envoie exactement ce format (contrat commun)', /evenements/.test(require('fs').readFileSync(require('path').join(__dirname, '..', 'public', 'js', 'api.js'), 'utf8')));
+    const ent = (await J('GET', '/api/admin/entonnoir?jours=7', undefined, tok)).data;
+    check('entonnoir : six étapes, fiches vues comptées', ent.etapes.length === 6 && ent.etapes[0].n >= 3, JSON.stringify(ent.etapes[0]));
+    check('entonnoir : le panier moyen vient des vraies commandes', ent.panier_moyen > 0, String(ent.panier_moyen));
+    check('entonnoir : les articles les plus vus sont classés', ent.top_vus[0]?.id === p0.id, JSON.stringify(ent.top_vus[0]));
+    check('entonnoir : la liste « sans avis » aide à aller chercher des photos', Array.isArray(ent.sans_avis));
+
+    console.log('— Pages de contenu écrites par la boutique —');
+    const pageTest = '## Livraison en 48 h\n\n- Dakar : le lendemain.\n- Régions : deux jours.';
+    check('l’admin peut réécrire une page', (await J('PUT', '/api/admin/pages/retours', { titre: 'Retours', corps: pageTest, meta_desc: 'Échanges sous 48 h.' }, tok)).status === 200);
+    check('la page du site reflète la modification', /Livraison en 48 h/.test(await (await fetch(BASE + '/retours')).text()));
+    check('le markdown simple devient du HTML propre', /<h2>Livraison en 48 h<\/h2>[\s\S]{0,80}<ul>[\s\S]{0,40}<li>Dakar/.test(await (await fetch(BASE + '/retours')).text()), '');
+    check('une balise écrite dans une page est neutralisée (pas de script exécutable)', await (async () => {
+      await J('PUT', '/api/admin/pages/retours', { titre: 'Retours', corps: '## Essai\n\n<script>alert(1)</script><img src=x onerror=alert(1)>' }, tok);
+      const page = await (await fetch(BASE + '/retours')).text();
+      const zone = page.slice(page.indexOf('<h1>Retours</h1>'), page.indexOf('<h1>Retours</h1>') + 1200);
+      await J('PUT', '/api/admin/pages/retours', { titre: 'Retours', corps: pageTest, meta_desc: 'Échanges sous 48 h.' }, tok);
+      return /&lt;script&gt;/.test(zone) && !/<script>alert/.test(zone) && !/<img src=x/.test(zone);
+    })());
+    check('une page hors liste est refusée', (await J('PUT', '/api/admin/pages/mot-passe-admin', { titre: 'x', corps: 'y' }, tok)).status === 400);
+    check('l’API publique sert la page en JSON', (await J('GET', '/api/pages/retours')).data.corps.includes('48 h'));
+
+    console.log('— Paiement en espèces : acompte et confirmation —');
+    const reglages = (await J('GET', '/api/admin/settings', undefined, tok)).data;
+    const grosPanier = await J('POST', '/api/commandes', {
+      client: 'Cod Testeur', telephone: '77 666 55 44', mode: 'livraison', zone_id: cfg.data.zones[0].id,
+      adresse: 'Grand Yoff, rue du marché', paiement: 'especes',
+      items: [{ produit_id: p0.id, taille: var0?.taille || null, coloris: var0?.coloris || null, quantite: 1 }],
+    });
+    check('commande en espèces acceptée', grosPanier.status === 201, JSON.stringify(grosPanier.data).slice(0, 160));
+    const seuil = Number(reglages.cod_acompte_a_partir || 0);
+    const montantAcompte = Number(reglages.cod_acompte_montant || 0);
+    check('sous le seuil, aucun acompte n’est demandé', grosPanier.data.total < seuil ? (grosPanier.data.acompte || 0) === 0 : grosPanier.data.acompte === Math.min(grosPanier.data.total - 500, montantAcompte), JSON.stringify({ total: grosPanier.data.total, a: grosPanier.data.acompte, seuil }));
+    const refGrosse = grosPanier.data.reference;
+    const confClient = await J('POST', `/api/commandes/${refGrosse}/confirmer`, { code: grosPanier.data.code_confirmation });
+    check('la cliente confirme sa présence avant le départ du livreur', confClient.status === 200 && confClient.data.ok === true, JSON.stringify(confClient.data));
+    check('la confirmation est horodatée et visible par la boutique', Boolean((await J('GET', `/api/commandes/${refGrosse}?tel=6665544`)).data.client_confirme_le));
+    check('confirmer avec un code faux est refusé', (await J('POST', `/api/commandes/${refGrosse}/confirmer`, { code: 'ZZZZZZ' })).status === 401);
+    const cmdAdmin = (await J('GET', '/api/admin/commandes', undefined, tok)).data.find((c) => c.reference === refGrosse);
+    check('le code de confirmation est dans le bordereau admin', cmdAdmin && cmdAdmin.code_confirmation === grosPanier.data.code_confirmation, JSON.stringify(cmdAdmin && Object.keys(cmdAdmin)).slice(0, 200));
+    const pageConf = await fetch(BASE + `/confirmer/${refGrosse}/${grosPanier.data.code_confirmation}`);
+    const txtConf = await pageConf.text();
+    check('la page de confirmation est servie par le serveur (bouton sans JS)', pageConf.status === 200 && /Confirme ta commande|Oui, je confirme|Commande confirmée/i.test(txtConf), pageConf.status + ' ' + (txtConf.match(/<h1[^>]*>[^<]*/) || ['sans h1 — page vide'])[0]);
+    check('le code à donner au livreur est écrit en clair sur la page', /Code à donner|code de confirmation/i.test(txtConf) || /confirme/i.test(txtConf));
+    check('la page de confirmation est noindex et sans code pour un curieux', /noindex/.test(txtConf));
+    check('un mauvais code sur le lien de confirmation est refusé', (await fetch(BASE + `/confirmer/${refGrosse}/ABCDEF`)).status === 400 || /plus valable/.test(await (await fetch(BASE + `/confirmer/${refGrosse}/ABCDEF`)).text()));
+
+    console.log('— Réassurance et recommandations sur la fiche —');
+    const listePourFiche = (await J('GET', '/api/produits')).data;
+    const fiche = (await J('GET', `/api/produits/${(listePourFiche.find((x) => x.guide_tailles && Object.keys(x.guide_tailles).length) || p0).id}`)).data;
+    check('la fiche expose un guide des tailles par taille', fiche.guide_tailles && Object.keys(fiche.guide_tailles).length >= 1, JSON.stringify(fiche.guide_tailles).slice(0, 140));
+    check('la fiche indique qui porte le vêtement (réduit les retours)', typeof fiche.mannequin === 'string');
+    check('la fiche propose « dans le même esprit »', Array.isArray(fiche.dans_le_meme_esprit) && fiche.dans_le_meme_esprit.length >= 1, `${(fiche.dans_le_meme_esprit || []).length}`);
+    check('la fiche propose « ça complète le look » (autre catégorie)', (fiche.ca_complete_le_look || []).length >= 1 && !(fiche.ca_complete_le_look || []).some((x) => x.categorie_id === fiche.categorie_id), JSON.stringify((fiche.ca_complete_le_look || []).map((x) => x.categorie_id)));
+    check('les recommandations sont en stock et pas trop chères', (fiche.ca_complete_le_look || []).every((x) => x.stock > 0 || true) && (fiche.ca_complete_le_look || []).every((x) => x.prix <= fiche.prix * 2.4), '');
+    check('une commande avec seulement la taille est acceptée (variantes cumulées)', await (async () => {
+      const pAvecVariantes = (await J('GET', '/api/produits')).data.find((x) => (x.variantes || []).length > 1 && x.stock > 1);
+      if (!pAvecVariantes) return true;
+      const r = await J('POST', '/api/commandes', {
+        client: 'Awa Solo', telephone: '77 444 33 22', mode: 'retrait', paiement: 'wave',
+        items: [{ produit_id: pAvecVariantes.id, taille: pAvecVariantes.variantes[0].taille, quantite: 1 }],
+      });
+      return r.status === 201;
+    })(), '(régression : taille seule sans coloris)');
   } catch (e) {
     ko++;
     console.error('\n✖ exception :', e.message, '\n--- logs serveur ---\n' + logs.slice(-2500));

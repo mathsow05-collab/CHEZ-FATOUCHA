@@ -9,7 +9,8 @@ if (!process.env.JWT_SECRET) {
   console.warn('[sécurité] JWT_SECRET absent : secret temporaire généré (les sessions admin sauteront au redémarrage).');
 }
 
-const { db, getSetting } = require('./db');
+const { db, getSetting, addLog } = require('./db');
+const optima = require('./optima');
 const { seed } = require('./seed');
 const { PUBLIC_DIR, UPLOADS_DIR, DATA_DIR, ADMIN_UI_DIR } = require('./paths');
 
@@ -35,6 +36,7 @@ app.use((req, res, next) => {
       "img-src 'self' data: blob: https: http:",
       "style-src 'self' 'unsafe-inline'",
       "script-src 'self'",
+      "media-src 'self' blob:",
       "connect-src 'self'",
       "font-src 'self' data:",
       // Anti click-jacking : strict par défaut. ALLOW_FRAMES=1 ne sert qu'à un
@@ -106,8 +108,172 @@ for (const [suffixe, meta] of Object.entries(ENVOI_ADMIN)) {
   });
 }
 
-/* ------------------------- Frontend (SPA à hash) ------------------------- */
-app.use(express.static(PUBLIC_DIR, { extensions: ['html'], index: 'index.html' }));
+/* ------------------------- Images optimisées à la volée -------------------------
+   /img/480/media/demo/robe-boheme.jpg renvoie un WebP de 480 px, mis en cache
+   sur le disque : une vignette ne pèse plus le poids d'un cliché de téléphone. */
+app.use('/img', optima.route());
+
+/* ------------------------- Fichiers pour les moteurs -------------------------
+   sitemap.xml et robots.txt sont construits depuis la base : ils suivent tout
+   seuls les articles publiés ou masqués par la boutique. */
+const SEO = require('./pages');
+app.get('/sitemap.xml', (req, res) => {
+  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.send(SEO.sitemap(SEO.baseAbsolue(req)));
+});
+app.get('/robots.txt', (req, res) => {
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.send(SEO.robots(SEO.baseAbsolue(req)));
+});
+
+/* Manifeste et service worker : le site s'installe sur l'écran d'accueil et
+   garde le catalogue en cache pour les réseaux lents. */
+app.get('/manifest.webmanifest', (req, res) => {
+  const f = path.join(PUBLIC_DIR, 'manifest.webmanifest');
+  if (!fs.existsSync(f)) return res.status(404).end();
+  res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.send(fs.readFileSync(f, 'utf8'));
+});
+app.get('/sw.js', (req, res) => {
+  const f = path.join(PUBLIC_DIR, 'sw.js');
+  if (!fs.existsSync(f)) return res.status(404).end();
+  res.setHeader('Content-Type', 'text/javascript; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store'); /* un worker périmé serait pire qu'aucun */
+  res.setHeader('Service-Worker-Allowed', '/');
+  res.send(fs.readFileSync(f, 'utf8'));
+});
+
+/* ------------------------- Pages rendues par le serveur -------------------------
+   Ce que Google, WhatsApp et Instagram voient de la boutique : titre, prix,
+   photos, note moyenne, guide des tailles — directement dans le HTML reçu,
+   avant tout JavaScript. Le front prend ensuite la main sur la même URL. */
+const cat = require('./catalogue');
+const PAGES_SLUGS = ['faq', 'retours', 'livraison', 'a-propos'];
+
+function reponseHTML(res, corps, statut = 200) {
+  res.status(statut);
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', statut === 200 ? 'public, max-age=60, stale-while-revalidate=300' : 'no-store');
+  res.send(corps);
+}
+
+function pageSimple(titre, texte, statut = 200) {
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex,nofollow" />
+<title>${SEO.ech(titre)} — ${SEO.ech(getSetting('nom_boutique', 'CHEZ FATOUCHA'))}</title>
+<link rel="stylesheet" href="/css/style.css" /></head>
+<body><div class="wrap"><div class="bloc"><h1>${SEO.ech(titre)}</h1><p>${SEO.ech(texte)}</p>
+<p><a class="btn gold" href="/boutique">← Retour à la boutique</a></p></div></div></body></html>`;
+}
+
+function retrouverCommande(req) {
+  const ref = String(req.params.reference || '').trim().toUpperCase();
+  const code = String(req.params.code || '').trim().toUpperCase();
+  const c = db.prepare('SELECT * FROM commandes WHERE reference = ?').get(ref);
+  if (!c) return { cmd: null, erreur: 'Commande introuvable.' };
+  if (code && String(c.code_confirmation || '').toUpperCase() !== code) return { cmd: null, erreur: 'Ce lien n’est plus valable.' };
+  return { cmd: c };
+}
+const COMMANDE_VIDE = { reference: '—', client: '', total: 0, frais: 0, paiement: 'especes' };
+
+app.get(['/', '/index.html'], (req, res, next) => {
+  try {
+    reponseHTML(res, SEO.accueil(req));
+  } catch (e) {
+    console.error('[ssr] accueil :', e.message);
+    next();
+  }
+});
+
+app.get('/boutique', (req, res, next) => {
+  try {
+    const v = req.query;
+    reponseHTML(res, SEO.boutique(req, { q: String(v.q || '').slice(0, 80), categorie: v.categorie || null, tri: String(v.tri || 'recent') }));
+  } catch (e) {
+    console.error('[ssr] boutique :', e.message);
+    next();
+  }
+});
+
+app.get('/produit/:cle', (req, res, next) => {
+  try {
+    const cle = String(req.params.cle || '').slice(0, 90);
+    const row = cat.produitParCle(cle, { includeInactive: true });
+    if (!row) return reponseHTML(res, pageSimple('Article indisponible', 'Cette pièce n’est plus au catalogue.', 404), 404);
+    /* un ancien lien partagé /produit/5 repart vers l'URL lisible */
+    if (/^\d+$/.test(cle) && row.slug) return res.redirect(301, `/produit/${row.slug}`);
+    if (!row.actif) return res.redirect(302, '/boutique');
+    reponseHTML(res, SEO.produit(req, row));
+  } catch (e) {
+    console.error('[ssr] produit :', e.message);
+    next();
+  }
+});
+
+app.get('/categorie/:cle', (req, res, next) => {
+  try {
+    const c = cat.categorieParCle(String(req.params.cle || '').slice(0, 80));
+    if (!c) return reponseHTML(res, pageSimple('Catégorie introuvable', 'Cette catégorie n’existe plus.', 404), 404);
+    if (/^\d+$/.test(String(req.params.cle)) && c.slug) return res.redirect(301, `/categorie/${c.slug}`);
+    reponseHTML(res, SEO.categorie(req, c));
+  } catch (e) {
+    console.error('[ssr] catégorie :', e.message);
+    next();
+  }
+});
+
+for (const slugP of PAGES_SLUGS) {
+  app.get('/' + slugP, (req, res, next) => {
+    try {
+      const page = db.prepare('SELECT * FROM pages WHERE slug = ?').get(slugP);
+      if (!page) return next();
+      reponseHTML(res, SEO.pageContenu(req, page, { avecFaq: slugP === 'faq' }));
+    } catch (e) {
+      console.error('[ssr] page :', e.message);
+      next();
+    }
+  });
+}
+
+/* Confirmation d'une commande en espèces : un bouton, aucun JavaScript
+   nécessaire (le lien arrive par WhatsApp). Le code reçu sert de clé. */
+app.get('/confirmer/:reference/:code', (req, res, next) => {
+  try {
+    const { cmd, erreur } = retrouverCommande(req);
+    reponseHTML(res, SEO.confirmation(req, { cmd: cmd || COMMANDE_VIDE, erreur: cmd ? erreur : erreur || '' }), cmd ? 200 : 404);
+  } catch (e) {
+    console.error('[confirmer] GET :', e.message);
+    next();
+  }
+});
+app.post('/confirmer/:reference/:code', (req, res, next) => {
+  try {
+    const { cmd } = retrouverCommande(req);
+    const code = String(req.params.code || '').trim().toUpperCase();
+    if (!cmd || (cmd.code_confirmation && code !== String(cmd.code_confirmation).toUpperCase())) {
+      return reponseHTML(res, SEO.confirmation(req, {
+        cmd: cmd || { ...COMMANDE_VIDE, reference: String(req.params.reference || '').toUpperCase() },
+        erreur: 'Ce lien n’est plus valable — écris-nous sur WhatsApp.',
+      }), 400);
+    }
+    if (cmd.statut !== 'annulee' && !cmd.client_confirme_le) {
+      db.prepare('UPDATE commandes SET client_confirme_le = ? WHERE id = ?').run(new Date().toISOString(), cmd.id);
+      addLog('commande_confirmee', { source: 'client', ref: cmd.reference, details: 'page', req });
+    }
+    return reponseHTML(res, SEO.confirmation(req, { cmd: db.prepare('SELECT * FROM commandes WHERE id = ?').get(cmd.id), ok: true }));
+  } catch (e) {
+    console.error('[confirmer] POST :', e.message);
+    next();
+  }
+});
+
+/* ------------------------- Frontend (application) -------------------------
+   Le reste du site (panier, commande, paiement, suivi) reste rendu par le
+   front ; ces URLs-là sont en noindex, elles n'ont rien à chercher. */
+app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
 /* Toute URL qui n'est pas une ressource de l'API renvoie le SPA (routes à #). */
 app.use((req, res, next) => {
   const p = req.path || '/';

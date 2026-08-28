@@ -8,7 +8,11 @@ const multer = require('multer');
 
 const { db, getSetting, setSetting, allSettings, addLog, STOCK_STATUTS_ACTIFS } = require('../db');
 const { hashPassword, verifyPassword, signToken, verifyToken, rateLimiter, normalizePhone } = require('../security');
-const { produitPublic, listeVariantes, majStock, balayageCommandesImpayees, parseJson } = require('../catalogue');
+const {
+  produitPublic, listeVariantes, majStock, balayageCommandesImpayees, parseJson,
+  preparerSlug, ecrireGuide, lireGuide, resumeAvis,
+} = require('../catalogue');
+const optima = require('../optima');
 const paiement = require('../paiement');
 const scrape = require('../scrape');
 
@@ -89,6 +93,15 @@ router.get('/dashboard', (req, res) => {
       )
       .all(),
     paiement_mode: paiement.mode(),
+    avis_en_attente: db.prepare('SELECT COUNT(*) AS n FROM avis WHERE approuve = 0').get().n,
+    avis_total: db.prepare('SELECT COUNT(*) AS n FROM avis WHERE approuve = 1').get().n,
+    alertes_stock: db.prepare('SELECT COUNT(*) AS n FROM alertes_stock WHERE notifie_le IS NULL').get().n,
+    commandes_a_confirmer: db
+      .prepare("SELECT COUNT(*) AS n FROM commandes WHERE paiement = 'especes' AND client_confirme_le IS NULL AND statut = 'nouvelle'")
+      .get().n,
+    paniers_en_attente: db
+      .prepare("SELECT COUNT(*) AS n FROM paniers WHERE total > 0 AND updated_at > datetime('now','-3 days')")
+      .get().n,
   });
 });
 
@@ -136,6 +149,17 @@ router.get('/produits', (req, res) => {
   );
 });
 
+/* Vidéo de fiche : fichier téléversé sur le site, ou lien externe (TikTok/
+   YouTube) que la cliente ouvre dans un onglet — on n'encastre pas un lecteur
+   tiers dans la page (préférence explicite de la politique de sécurité). */
+function nettoyerVideo(v) {
+  const brut = String(v || '').trim();
+  if (!brut) return null;
+  if (/^\/uploads\/[a-z0-9._\/-]+$/i.test(brut)) return brut.slice(0, 400);
+  if (/^https?:\/\/(www\.)?(youtube\.com|youtu\.be|vimeo\.com|tiktok\.com|instagram\.com)\/\S{1,300}$/i.test(brut)) return brut.slice(0, 400);
+  return null;
+}
+
 function nettoyerProduit(b) {
   const prix = Math.round(Number(b.prix));
   const errs = [];
@@ -161,6 +185,11 @@ function nettoyerProduit(b) {
       marque: String(b.marque || '').trim().slice(0, 60) || null,
       lien_source: String(b.lien_source || '').trim().slice(0, 600) || null,
       delai_jours: Math.min(120, Math.max(0, Math.round(Number(b.delai_jours) || 7))),
+      /* Une vidéo de 5 secondes qui montre le tissu qui bouge vend mieux que
+         trois photos fixes ; soit un fichier du site, soit un lien externe. */
+      video_url: nettoyerVideo(b.video_url),
+      mannequin: String(b.mannequin || '').trim().slice(0, 160) || null,
+      guide_tailles: ecrireGuide(b.guide_tailles),
       images: JSON.stringify(images),
       tailles: JSON.stringify((Array.isArray(b.tailles) ? b.tailles : []).map((s) => String(s).slice(0, 20)).slice(0, 15)),
       coloris: JSON.stringify((Array.isArray(b.coloris) ? b.coloris : []).map((s) => String(s).slice(0, 30)).slice(0, 15)),
@@ -174,28 +203,79 @@ function nettoyerProduit(b) {
 
 router.post('/produits', (req, res) => {
   const { errs, valeurs } = nettoyerProduit(req.body || {});
+  const b = req.body || {};
   if (errs.length) return res.status(400).json({ error: errs.join(' ') });
+  const valeurs2 = {
+    ...valeurs,
+    slug: preparerSlug(valeurs.titre, null, b?.slug || ''),
+    video_url: valeurs.video_url,
+    mannequin: valeurs.mannequin,
+    guide_tailles: valeurs.guide_tailles,
+  };
+  /* Nommé, pas positionnel : l'ordre des clés d'un objet spread n'est pas celui
+     des colonnes, et un décalage d'une colonne écraserait silencieusement les photos. */
   const r = db
     .prepare(
       `INSERT INTO produits (titre, description, prix, prix_barre, prix_achat, marque, lien_source, delai_jours,
-        images, tailles, coloris, stock, categorie_id, actif, vedette) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+        images, tailles, coloris, stock, categorie_id, actif, vedette, slug, video_url, mannequin, guide_tailles)
+       VALUES (@titre,@description,@prix,@prix_barre,@prix_achat,@marque,@lien_source,@delai_jours,
+        @images,@tailles,@coloris,@stock,@categorie_id,@actif,@vedette,@slug,@video_url,@mannequin,@guide_tailles)`
     )
-    .run(...Object.values(valeurs));
+    .run(valeurs2);
   appliquerVariantes(Number(r.lastInsertRowid), req.body);
   addLog('produit_cree', { source: 'admin', ref: valeurs.titre, req });
-  return res.status(201).json({ id: Number(r.lastInsertRowid) });
+  const cree = db.prepare('SELECT id, slug FROM produits WHERE id = ?').get(Number(r.lastInsertRowid));
+  return res.status(201).json({ id: cree.id, slug: cree.slug, url: '/produit/' + cree.slug });
 });
+
+/* Corps de mise à jour : ce que la boutique n'a pas envoyé reste inchangé.
+   Sans ça, un PUT partiel (script, import, vieux formulaire) effacerait les
+   photos, le guide des tailles ou la ligne « portée par ». */
+function pourMaj(avant) {
+  if (!avant) return {};
+  return {
+    titre: avant.titre,
+    description: avant.description,
+    prix: avant.prix,
+    prix_barre: avant.prix_barre,
+    prix_achat: avant.prix_achat,
+    marque: avant.marque,
+    lien_source: avant.lien_source,
+    delai_jours: avant.delai_jours,
+    images: parseJson(avant.images, []),
+    tailles: parseJson(avant.tailles, []),
+    coloris: parseJson(avant.coloris, []),
+    stock: avant.stock,
+    categorie_id: avant.categorie_id,
+    actif: !!avant.actif,
+    vedette: !!avant.vedette,
+    video_url: avant.video_url || '',
+    mannequin: avant.mannequin || '',
+    guide_tailles: lireGuide(avant.guide_tailles),
+    slug: avant.slug,
+  };
+}
 
 router.put('/produits/:id', (req, res) => {
   const id = Number(req.params.id);
-  if (!db.prepare('SELECT id FROM produits WHERE id = ?').get(id)) return res.status(404).json({ error: 'Produit introuvable.' });
-  const { errs, valeurs } = nettoyerProduit(req.body || {});
+  const avantComplet = db.prepare('SELECT * FROM produits WHERE id = ?').get(id);
+  if (!avantComplet) return res.status(404).json({ error: 'Produit introuvable.' });
+  const corps = { ...pourMaj(avantComplet), ...(req.body || {}) };
+  const { errs, valeurs } = nettoyerProduit(corps);
   if (errs.length) return res.status(400).json({ error: errs.join(' ') });
+  const avant = db.prepare('SELECT stock, slug FROM produits WHERE id = ?').get(id);
   db.prepare(
     `UPDATE produits SET titre=@titre, description=@description, prix=@prix, prix_barre=@prix_barre, prix_achat=@prix_achat,
        marque=@marque, lien_source=@lien_source, delai_jours=@delai_jours, images=@images, tailles=@tailles, coloris=@coloris,
-       stock=@stock, categorie_id=@categorie_id, actif=@actif, vedette=@vedette, updated_at=@updated_at WHERE id=@id`
-  ).run({ ...valeurs, id, updated_at: new Date().toISOString() });
+       stock=@stock, categorie_id=@categorie_id, actif=@actif, vedette=@vedette, slug=@slug, video_url=@video_url,
+       mannequin=@mannequin, guide_tailles=@guide_tailles, updated_at=@updated_at WHERE id=@id`
+  ).run({
+    ...valeurs,
+    id,
+    slug: preparerSlug(valeurs.titre, id, corps.slug || ''),
+    updated_at: new Date().toISOString(),
+  });
+  alerteRetourEnStock(id, avant?.stock ?? 0, valeurs.stock);
   syncVariantes(id, req.body);
   addLog('produit_modifie', { source: 'admin', ref: String(id), req });
   return res.json({ ok: true });
@@ -208,7 +288,13 @@ router.patch('/produits/:id', (req, res) => {
   const args = [];
   if ('actif' in b) { maj.push('actif = ?'); args.push(b.actif ? 1 : 0); }
   if ('vedette' in b) { maj.push('vedette = ?'); args.push(b.vedette ? 1 : 0); }
-  if ('stock' in b) { maj.push('stock = ?'); args.push(Math.max(0, Math.round(Number(b.stock) || 0))); }
+  if ('stock' in b) {
+    const nouveau = Math.max(0, Math.round(Number(b.stock) || 0));
+    const avant = db.prepare('SELECT stock FROM produits WHERE id = ?').get(id)?.stock ?? 0;
+    maj.push('stock = ?');
+    args.push(nouveau);
+    setTimeout(() => alerteRetourEnStock(id, avant, nouveau), 0);
+  }
   if ('prix' in b) { maj.push('prix = ?'); args.push(Math.round(Number(b.prix))); }
   if ('delai_jours' in b) { maj.push('delai_jours = ?'); args.push(Math.round(Number(b.delai_jours) || 0)); }
   if (!maj.length) return res.status(400).json({ error: 'Rien à modifier.' });
@@ -273,6 +359,17 @@ function syncVariantes(produitId, b) {
   }
 }
 
+/* Quand une rupture revient en stock, on prépare la liste des clientes abonnées
+   (le message WhatsApp se clique une par une : c'est le canal qui marche ici) et
+   on marque l'alerte comme traitée pour qu'elle ne revienne pas. */
+function alerteRetourEnStock(produitId, avant, apres) {
+  if (!(Number(avant) <= 0 && Number(apres) > 0)) return;
+  const n = db
+    .prepare("UPDATE alertes_stock SET notifie_le = ? WHERE produit_id = ? AND notifie_le IS NULL")
+    .run(new Date().toISOString(), produitId).changes;
+  if (n) addLog('retour_stock', { source: 'admin', ref: String(produitId), details: `${n} alerte(s) à prévenir` });
+}
+
 function recalculerStockGlobal(produitId) {
   const n = db.prepare('SELECT COALESCE(SUM(stock),0) AS n FROM variantes WHERE produit_id = ?').get(produitId).n;
   return Number(n);
@@ -299,7 +396,7 @@ router.post('/produits/importer-url', async (req, res) => {
   const echecs = [];
   for (const im of (info.images || []).slice(0, Number(req.body?.max || 6))) {
     try {
-      locales.push(await scrape.telechargerImage(im, IMG_DIR));
+      locales.push(await optima.reduire(IMG_DIR, await scrape.telechargerImage(im, IMG_DIR)));
     } catch (e) {
       echecs.push(e.message);
     }
@@ -328,7 +425,7 @@ router.post('/images-from-url', async (req, res) => {
   for (const u of urls) {
     if (!/^https?:\/\//i.test(String(u))) { erreurs.push('URL invalide : ' + String(u).slice(0, 40)); continue; }
     try {
-      const nom = await scrape.telechargerImage(String(u), IMG_DIR);
+      const nom = await optima.reduire(IMG_DIR, await scrape.telechargerImage(String(u), IMG_DIR));
       urls_ok.push('/uploads/produits/' + nom);
     } catch (e) {
       erreurs.push(e.message || 'échec');
@@ -357,11 +454,37 @@ const upload = multer({
   },
 });
 
-router.post('/upload', upload.array('files', 10), (req, res) => {
-  const urls = (req.files || []).map((f) => `/uploads/produits/${f.filename}`);
-  if (!urls.length) return res.status(400).json({ error: 'Aucun fichier reçu.' });
+/* Une photo de téléphone fait 3 à 5 Mo. On la ramène à 1200 px en WebP tout de
+   suite : le disque de l'hébergeur est petit, et les tailles plus petites
+   (vignettes) sont fabriquées à la demande par la route /img. */
+router.post('/upload', upload.array('files', 10), async (req, res) => {
+  const recus = req.files || [];
+  if (!recus.length) return res.status(400).json({ error: 'Aucun fichier reçu.' });
+  const urls = [];
+  let gagner = 0;
+  for (const f of recus) {
+    const nom = await optima.reduire(IMG_DIR, f.filename);
+    const octets = fs.existsSync(path.join(IMG_DIR, nom)) ? fs.statSync(path.join(IMG_DIR, nom)).size : 0;
+    gagner += Math.max(0, f.size - octets);
+    urls.push(`/uploads/produits/${nom}`);
+  }
   addLog('upload_images', { source: 'admin', ref: String(req.admin.username), details: urls.join(' ') });
-  return res.json({ urls });
+  return res.json({ urls, economise_ko: Math.round(gagner / 1024) });
+});
+
+/* Vidéo de fiche (5 à 10 s suffisent) : mp4/webm, 20 Mo max, même dossier. */
+const uploadVideo = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, IMG_DIR),
+    filename: (req, file, cb) => cb(null, `${Date.now()}-${crypto.randomBytes(5).toString('hex')}${(path.extname(file.originalname) || '.mp4').toLowerCase().replace(/[^.a-z0-9]/g, '')}`),
+  }),
+  limits: { fileSize: 20 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => (/^video\/(mp4|webm|quicktime)$/i.test(file.mimetype) ? cb(null, true) : cb(new Error('Format vidéo accepté : MP4 ou WEBM.'))),
+});
+router.post('/upload-video', uploadVideo.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Aucune vidéo reçue.' });
+  addLog('upload_video', { source: 'admin', ref: String(req.admin.username), details: req.file.filename });
+  return res.json({ url: `/uploads/produits/${req.file.filename}`, octets: req.file.size });
 });
 
 /* ---------------- Catégories & zones ---------------- */
@@ -523,13 +646,166 @@ router.post('/commandes/:id/payer', (req, res) => {
 
 router.get('/commandes-export', (req, res) => {
   const rows = db.prepare('SELECT * FROM commandes ORDER BY id DESC LIMIT 2000').all();
-  const entetes = ['reference', 'created_at', 'client', 'telephone', 'mode', 'zone_id', 'adresse', 'sous_total', 'frais', 'total', 'paiement', 'statut_paiement', 'statut', 'payee_le'];
+  const entetes = ['reference', 'created_at', 'client', 'telephone', 'mode', 'zone_id', 'adresse', 'sous_total', 'frais', 'total', 'paiement', 'statut_paiement', 'statut', 'payee_le', 'acompte', 'reste_a_payer', 'client_confirme_le'];
   const csv = [entetes.join(',')].concat(
     rows.map((r) => entetes.map((k) => `"${String(r[k] ?? '').replace(/"/g, '""')}"`).join(','))
   ).join('\n');
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="commandes-fatoucha-${new Date().toISOString().slice(0, 10)}.csv"`);
   res.send('\uFEFF' + csv);
+});
+
+/* ---------------- Avis : modération et réponses ---------------- */
+router.get('/avis', (req, res) => {
+  const etat = req.query.etat === 'tous' ? 'tous' : 'en_attente';
+  const rows = db
+    .prepare(
+      `SELECT a.*, p.titre AS produit_titre, p.slug AS produit_slug, c.reference, c.client
+         FROM avis a
+         LEFT JOIN produits p ON p.id = a.produit_id
+         LEFT JOIN commandes c ON c.id = a.commande_id
+        ${etat === 'en_attente' ? 'WHERE a.approuve = 0' : ''}
+        ORDER BY a.id DESC LIMIT 300`
+    )
+    .all();
+  res.json(rows);
+});
+
+router.patch('/avis/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const a = db.prepare('SELECT * FROM avis WHERE id = ?').get(id);
+  if (!a) return res.status(404).json({ error: 'Avis introuvable.' });
+  const maj = [];
+  const args = [];
+  if ('approuve' in req.body) { maj.push('approuve = ?'); args.push(req.body.approuve ? 1 : 0); }
+  if ('note' in req.body) { maj.push('note = ?'); args.push(Math.max(1, Math.min(5, Math.round(Number(req.body.note) || 5)))); }
+  if ('texte' in req.body) { maj.push('texte = ?'); args.push(String(req.body.texte || '').slice(0, 900) || null); }
+  if ('reponse' in req.body) { maj.push('reponse = ?'); args.push(String(req.body.reponse || '').slice(0, 600) || null); }
+  if (!maj.length) return res.status(400).json({ error: 'Rien à modifier.' });
+  args.push(id);
+  db.prepare(`UPDATE avis SET ${maj.join(', ')} WHERE id = ?`).run(...args);
+  addLog('avis_maj', { source: 'admin', ref: String(id), details: maj.join(','), req });
+  return res.json({ ok: true, resume: resumeAvis(a.produit_id) });
+});
+
+router.delete('/avis/:id', (req, res) => {
+  const a = db.prepare('SELECT * FROM avis WHERE id = ?').get(Number(req.params.id));
+  if (!a) return res.status(404).json({ error: 'Avis introuvable.' });
+  db.prepare('DELETE FROM avis WHERE id = ?').run(a.id);
+  if (a.photo) fs.rmSync(path.join(UPLOADS_DIR, 'avis', path.basename(a.photo)), { force: true });
+  addLog('avis_supprime', { source: 'admin', ref: String(a.id), req });
+  return res.json({ ok: true });
+});
+
+/* ---------------- Pages de contenu (FAQ, retours, livraison) ---------------- */
+const PAGES_AUTORISEES = ['faq', 'retours', 'livraison', 'a-propos'];
+
+router.get('/pages', (req, res) => res.json(db.prepare('SELECT * FROM pages ORDER BY slug').all()));
+router.get('/pages/:slug', (req, res) => {
+  const p = db.prepare('SELECT * FROM pages WHERE slug = ?').get(String(req.params.slug).slice(0, 40));
+  if (!p) return res.status(404).json({ error: 'Page introuvable.' });
+  res.json(p);
+});
+router.put('/pages/:slug', (req, res) => {
+  const slug = String(req.params.slug || '').toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 40);
+  if (!PAGES_AUTORISEES.includes(slug)) return res.status(400).json({ error: `Page inconnue (choix : ${PAGES_AUTORISEES.join(', ')}).` });
+  const titre = String(req.body?.titre || '').trim().slice(0, 120) || 'Information';
+  const corps = String(req.body?.corps || '').slice(0, 12000);
+  const meta = String(req.body?.meta_desc || '').trim().slice(0, 300) || null;
+  db.prepare(
+    `INSERT INTO pages (slug, titre, corps, meta_desc, updated_at) VALUES (?,?,?,?,?)
+     ON CONFLICT(slug) DO UPDATE SET titre = excluded.titre, corps = excluded.corps, meta_desc = excluded.meta_desc, updated_at = excluded.updated_at`
+  ).run(slug, titre, corps, meta, new Date().toISOString());
+  addLog('page_maj', { source: 'admin', ref: slug, req });
+  return res.json({ ok: true, url: '/' + slug });
+});
+
+/* ---------------- Alertes « retour en stock » ---------------- */
+router.get('/alertes-stock', (req, res) => {
+  res.json(
+    db.prepare(
+      `SELECT s.id, s.telephone, s.created_at, s.notifie_le, p.id AS produit_id, p.titre, p.slug, p.stock
+         FROM alertes_stock s JOIN produits p ON p.id = s.produit_id
+        ORDER BY s.notifie_le IS NOT NULL, s.id DESC LIMIT 200`
+    ).all()
+  );
+});
+router.post('/alertes-stock/:id/notifie', (req, res) => {
+  db.prepare('UPDATE alertes_stock SET notifie_le = ? WHERE id = ?').run(new Date().toISOString(), Number(req.params.id));
+  res.json({ ok: true });
+});
+router.delete('/alertes-stock/:id', (req, res) => {
+  db.prepare('DELETE FROM alertes_stock WHERE id = ?').run(Number(req.params.id));
+  res.json({ ok: true });
+});
+
+/* ---------------- Paniers enregistrés (relance) ---------------- */
+router.get('/paniers', (req, res) => {
+  const jours = Math.min(30, Number(req.query.jours) || 7);
+  const rows = db
+    .prepare("SELECT * FROM paniers WHERE total > 0 AND updated_at >= datetime('now', ?) ORDER BY updated_at DESC LIMIT 200")
+    .all('-' + jours + ' days');
+  res.json(
+    rows.map((r) => {
+      let lignes = [];
+      try { lignes = JSON.parse(r.items || '[]'); } catch { lignes = []; }
+      return {
+        jeton: r.jeton,
+        client: r.client,
+        telephone: r.telephone,
+        total: r.total,
+        nb: lignes.reduce((s, l) => s + (l.quantite || 1), 0),
+        articles: lignes.map((l) => db.prepare('SELECT titre, slug FROM produits WHERE id = ?').get(l.produit_id)?.titre || 'article retiré'),
+        updated_at: r.updated_at,
+        code_reprise: r.code_reprise || null,
+        a_deja_commande: r.telephone
+          ? db.prepare('SELECT COUNT(*) AS n FROM commandes WHERE telephone = ?').get(String(r.telephone)).n
+          : 0,
+      };
+    })
+  );
+});
+
+/* ---------------- Entonnoir de vente ---------------- */
+router.get('/entonnoir', (req, res) => {
+  const jours = Math.min(90, Number(req.query.jours) || 30);
+  const depuis = '-' + jours + ' days';
+  const compte = (type) => db.prepare("SELECT COUNT(*) AS n FROM evenements WHERE type = ? AND created_at >= datetime('now', ?)").get(type, depuis).n;
+  const vusFiche = compte('vue_fiche');
+  const ajoutPanier = compte('ajout_panier');
+  const ouverture = compte('ouverture_commande');
+  const engage = compte('paiement_engage');
+  const validees = db.prepare(`SELECT COUNT(*) AS n FROM commandes WHERE created_at >= datetime('now', ?)`).get(depuis).n;
+  const payees = db.prepare(`SELECT COUNT(*) AS n FROM commandes WHERE statut_paiement = 'paye' AND created_at >= datetime('now', ?)`).get(depuis).n;
+  return res.json({
+    jours,
+    etapes: [
+      { cle: 'fiches_vues', libelle: 'Fiches vues', n: vusFiche },
+      { cle: 'paniers', libelle: 'Ajouts au panier', n: ajoutPanier },
+      { cle: 'checkout', libelle: 'Commandes commencées', n: ouverture },
+      { cle: 'paiements', libelle: 'Paiements engagés', n: engage },
+      { cle: 'commandes', libelle: 'Commandes enregistrées', n: validees },
+      { cle: 'payees', libelle: 'Commandes payées', n: payees },
+    ],
+    conversion_fiche_commande: vusFiche ? Math.round((validees / vusFiche) * 1000) / 10 : 0,
+    panier_moyen: db.prepare(`SELECT COALESCE(AVG(total),0) AS n FROM commandes WHERE created_at >= datetime('now', ?)`).get(depuis).n,
+    top_vus: db
+      .prepare(
+        `SELECT e.produit_id AS id, p.titre, p.slug, COUNT(*) AS vues
+           FROM evenements e LEFT JOIN produits p ON p.id = e.produit_id
+          WHERE e.type = 'vue_fiche' AND e.created_at >= datetime('now', ?)
+          GROUP BY e.produit_id ORDER BY vues DESC LIMIT 8`
+      )
+      .all(depuis),
+    sans_avis: db
+      .prepare('SELECT p.id, p.titre, p.slug FROM produits p WHERE p.actif = 1 AND p.stock > 0 AND NOT EXISTS (SELECT 1 FROM avis a WHERE a.produit_id = p.id AND a.approuve = 1) ORDER BY p.vues DESC LIMIT 8')
+      .all(),
+  });
+});
+
+/* ---------------- Journaux (comprendre ce qui s'est passé) ---------------- */
+router.get('/logs', (req, res) => {
+  res.json(db.prepare('SELECT * FROM logs ORDER BY id DESC LIMIT 200').all());
 });
 
 /* ---------------- Réglages ---------------- */
@@ -550,6 +826,7 @@ const SETTINGS_EDITABLE = [
   'adresse_retrait', 'horaires_retrait', 'wave_numero', 'wave_nom', 'orange_numero', 'orange_nom',
   'livraison_gratuite_a_partir', 'caution_pourcentage', 'delai_retrait_heures', 'expiration_commande_h',
   'mode_paiement', 'cinetpay_site_id', 'cinetpay_api_key', 'seo_keywords',
+  'cod_acompte_a_partir', 'cod_acompte_montant',
 ];
 
 router.put('/settings', (req, res) => {
@@ -558,7 +835,7 @@ router.put('/settings', (req, res) => {
   for (const k of SETTINGS_EDITABLE) {
     if (!(k in b)) continue;
     let v = b[k];
-    if (k === 'livraison_gratuite_a_partir' || k === 'caution_pourcentage' || k === 'delai_retrait_heures' || k === 'expiration_commande_h') {
+    if (k === 'livraison_gratuite_a_partir' || k === 'caution_pourcentage' || k === 'delai_retrait_heures' || k === 'expiration_commande_h' || k === 'cod_acompte_a_partir' || k === 'cod_acompte_montant') {
       v = String(Math.max(0, Math.round(Number(v) || 0)));
     }
     if (k === 'mode_paiement' && !['auto', 'manuel', 'hybride'].includes(String(v))) v = 'auto';
