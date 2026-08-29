@@ -124,3 +124,10 @@ body.adm { background: var(--paper) }
 .private-flag { display: inline-flex; align-items: center; gap: 6px }
 .drop { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px }
 .btn .ico, .tag .ico { vertical-align: -.28em }
+
+/* La table des articles est large et défile à l'horizontale : les deux colonnes
+   de droite (vedette, actions) restent collées au bord, sinon on cherche le
+   crayon pendant des minutes. */
+.tbl-scroll th:nth-last-child(-n+2), .tbl-scroll td:nth-last-child(-n+2) {
+  position: sticky; right: 0; background: var(--nacre); z-index: 1; box-shadow: -12px 0 12px -12px rgba(0, 0, 0, .18)
+}

@@ -206,21 +206,29 @@ async function vueProduits(body) {
   body.innerHTML = `
   <div class="row spread" style="flex-wrap:wrap;gap:10px">
     <div><h2 style="margin:0">Produits <span class="muted small">(${rows.length})</span></h2>
-      <p class="small muted" style="margin:2px 0 0">Ajoute tes propres articles : photo, prix FCFA, tailles, stock, délai.</p></div>
+      <p class="small muted" style="margin:2px 0 0">Ajoute tes propres articles : photo, prix FCFA, tailles, stock, délai.
+      ${(() => {
+        const avec = rows.filter((r) => r.video);
+        const vertical = avec.filter((r) => r.video.format === 'vertical').length;
+        const mots = (n) => n + (n > 1 ? ' articles' : ' article');
+        return avec.length
+          ? `<b>${mots(avec.length)} sur ${rows.length} ont une vidéo</b>${vertical ? `, dont ${vertical} en Short (portrait)` : ''}.`
+          : `<span class="tag nouvelle">aucune vidéo enregistrée</span> sur ${rows.length} articles — tant que le champ n’est pas rempli dans l’article, la fiche n’a rien à afficher.`;
+      })()}</p></div>
     <div class="row" style="flex-wrap:wrap">
       <button class="btn sm ghost" data-filtre="tous" ${S.produits.etat === 'tous' ? 'style="border-color:var(--ink)"' : ''}>Tous</button>
       <button class="btn sm ghost" data-filtre="actifs" ${S.produits.etat === 'actifs' ? 'style="border-color:var(--ink)"' : ''}>En ligne</button>
       <button class="btn sm ghost" data-filtre="rupture" ${S.produits.etat === 'rupture' ? 'style="border-color:var(--ink)"' : ''}>Rupture</button>
       <button class="btn sm ghost" data-filtre="inactifs" ${S.produits.etat === 'inactifs' ? 'style="border-color:var(--ink)"' : ''}>Masqués</button>
       <input id="p-q" class="inp" style="height:34px;width:170px" placeholder="rechercher un article…" value="${esc(S.produits.q)}" />
-      <button class="btn gold" data-new>➕ Nouvel article</button>
+      <button class="btn gold" data-new>${icone('plus', { taille: 14 })} Nouvel article</button>
     </div>
   </div>
   ${rows.length ? `<div class="tbl-scroll"><table class="tbl">
     <thead><tr><th>Photo</th><th>Article</th><th>Prix</th><th>Stock</th><th>Délai</th><th>Cat.</th><th>Visible</th><th>★</th><th></th></tr></thead>
     <tbody>${rows.map((p) => `<tr>
       <td><img class="im" src="${esc(p.image || '/media/demo/robe-boheme.svg')}" onerror="this.src='/media/demo/robe-boheme.svg'" /></td>
-      <td><b>${esc(p.titre)}</b><br><span class="small muted">${p.marque ? esc(p.marque) + ' · ' : ''}${p.tailles.length ? 'tailles ' + p.tailles.join('/') + ' · ' : ''}${p.lien_source ? '<a class="link" href="' + esc(p.lien_source) + '" target="_blank" rel="noopener">lien fournisseur</a>' : 'sans lien'}</span></td>
+      <td><b>${esc(p.titre)}</b><br><span class="small muted">${p.marque ? esc(p.marque) + ' · ' : ''}${p.tailles.length ? 'tailles ' + p.tailles.join('/') + ' · ' : ''}${p.lien_source ? '<a class="link" href="' + esc(p.lien_source) + '" target="_blank" rel="noopener">lien fournisseur</a>' : 'sans lien'}</span><br>${p.video ? `<span class="tag payee">${icone('lecture', { taille: 12 })} ${p.video.format === 'vertical' ? 'Short' : 'vidéo'} · ${esc(p.video.etiquette)}${p.video.miniature_du_site ? ' · miniature rangée' : ' · sans miniature'}</span>` : '<span class="small muted">sans vidéo</span>'}</td>
       <td>${fcfa(p.prix)}${p.prix_barre ? `<br><s class="small muted">${fcfa(p.prix_barre)}</s>` : ''}</td>
       <td>${p.stock > 0 ? `<b>${p.stock}</b>` : '<span class="tag annulee">0</span>'}<br><span class="small muted">${p.reserve} réservé(s)</span></td>
       <td class="small">${p.delai_jours} j</td>
@@ -229,7 +237,7 @@ async function vueProduits(body) {
       <td><button class="btn sm ${p.vedette ? 'gold' : 'ghost'}" data-toggle="${p.id}" data-k="vedette" data-v="${p.vedette ? 0 : 1}">★</button></td>
       <td class="row" style="gap:4px"><button class="btn sm ghost" data-edit="${p.id}" aria-label="Modifier « ${esc(p.titre)} »" title="Modifier">${icone('crayon', { taille: 15 })}</button><button class="btn sm danger" data-del="${p.id}" aria-label="Désactiver « ${esc(p.titre)} »" title="Désactiver">${icone('poubelle', { taille: 15 })}</button></td>
     </tr>`).join('')}</tbody></table></div>`
-    : '<div class="bloc empty"><div class="big">👗</div><b>Aucun article.</b><br>Crée ton premier article : titre, prix, photo, tailles, stock.</div>'}
+    : `<div class="bloc empty"><div class="big">${icone('robe', { taille: 30 })}</div><b>Aucun article.</b><br>Crée ton premier article : titre, prix, photo, tailles, stock.</div>`}
   <div class="banner">💡 Astuce : si tu as la fiche de l’article en ligne, ouvre « Nouvel article → Récupérer depuis une URL » pour récupérer la photo automatiquement, puis corrige prix et tailles.</div>`;
 
   body.querySelector('[data-new]')?.addEventListener('click', () => formProduit(null));
@@ -433,7 +441,7 @@ async function formProduit(p) {
     sortieVideo.textContent = 'Lecture du lien…';
     try {
       const r = await aReq('POST', '/api/admin/video-info', { url: brut });
-      const format = r.format === 'vertical' ? 'format vertical (9:16)' : r.format === 'libre' ? (r.integrateur === 'lien' ? 'lien externe' : 'fichier lu directement') : 'format paysage (16:9)';
+      const format = r.format === 'vertical' ? 'Short vertical (9:16), lu en portrait' : r.format === 'libre' ? (r.integrateur === 'lien' ? 'lien externe' : 'fichier lu directement') : 'format paysage (16:9)';
       const facon = r.integrateur === 'cadre' ? 'lecteur intégré au toucher' : r.integrateur === 'lien' ? 'la fiche mettra un bouton qui ouvre la vidéo chez le fournisseur' : 'fichier du site';
       sortieVideo.innerHTML = `<span class="tag ${r.integrateur === 'lien' ? 'nouvelle' : 'payee'}">${esc(r.etiquette)}</span> ${esc(format)} · ${esc(facon)}${r.miniature_site ? ' · miniature recopiée ✔' : ''}`
         + (r.miniature_site ? ` <button class="btn sm ghost" type="button" id="f-video-phot">Utiliser la miniature comme photo</button>` : '')

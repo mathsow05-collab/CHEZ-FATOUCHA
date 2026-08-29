@@ -696,6 +696,11 @@ h2, h3 { font-family: var(--serif); font-weight: 400; letter-spacing: -.006em }
 .vod-play { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ivoire);
   transition: transform .16s var(--eased) }
 .vod-cart:hover .vod-play { transform: scale(1.14) }
+/* Un Short est une image 9:16 : dans une fenêtre 16:9, YouTube l'entoure de deux
+   bandes noires et la robe disparaît. Sur la carte, on passe donc le sceau en
+   portrait quand une miniature sans barres a pu être rangée ici. */
+.vod-cart.vertical .vod-mini { width: 42px; aspect-ratio: 9 / 16 }
+.vod-cart.vertical .vod-img { object-fit: cover }
 .vod-legende { display: flex; align-items: center; gap: 7px; font-size: 12.5px; line-height: 1.3 }
 .vod-duree { margin-left: auto; font-size: 10px; text-transform: uppercase; letter-spacing: .14em; color: var(--ink-2); opacity: .62 }
 /* la pastille se range à la fin des vignettes : la vidéo fait partie des photos

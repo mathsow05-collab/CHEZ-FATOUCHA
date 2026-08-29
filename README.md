@@ -293,6 +293,19 @@ raccourci, lui, peut changer de destination.
 Un lien WhatsApp, Facebook ou un fichier qui n'est pas sur le site reste refusé
 à dessein : la fiche d'une cliente ne charge rien en dehors des lecteurs listés.
 
+**Les Shorts** (vidéos verticales) sont traités à part, parce que c'est là que
+l'affichage casse le plus souvent : le cadre est en 9:16, la fenêtre s'ouvre en
+portrait, et la vignette est cherchée au **format d'origine** (`oardefault`) —
+l'image par défaut de YouTube, elle, entoure le Short de deux bandes noires et
+sur une carte de 42 px on ne voit plus l'article. Si YouTube ne fournit pas
+d'image portrait, aucune image n'est rangée : la carte garde le sceau de lecture
+sur fond d'encre, jamais les bandes noires ni la photo du produit.
+
+Côté espace vendeur, la liste des articles le dit directement : « 2 articles sur
+8 ont une vidéo, dont 2 en Short (portrait) », et chaque ligne porte
+*Short · YouTube · miniature rangée* ou la mention discrète *sans vidéo* —
+impossible de ne pas voir si l'enregistrement a pris.
+
 ### Plus le mot de passe de l'espace vendeur
 
 `ADMIN1_PASSWORD` ne sert qu'à la **création** du compte : le changer dans Render

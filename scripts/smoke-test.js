@@ -431,6 +431,24 @@ const J = async (method, url, body, token) => {
     const partage = (await J('GET', '/api/produits/' + p0.id)).data;
     check('et ce lien-là aboutit bien à un lecteur sur la fiche (pas une carte muette)', partage.video && /\/embed\/dQw4w9WgXcQ\?/.test(partage.video.cadre || ''), partage.video && partage.video.cadre);
     await J('PUT', '/api/admin/produits/' + p0.id, { video_url: '' }, tok);
+    /* un Short se range en portrait ou ne se range pas : l'image 16:9 de YouTube
+       entoure la vidéo de deux bandes noires et sur une carte de 42 px, ça fait
+       « le Short ne s'affiche pas ». L'invariant, c'est l'un ou l'autre, jamais
+       l'image barrée. */
+    const vShort = await J('POST', '/api/admin/video-info', { url: 'https://www.youtube.com/shorts/dQw4w9WgXcQ' }, tok);
+    check('un Short est reconnu en vertical, avec un lecteur intégré', vShort.data.ok && vShort.data.format === 'vertical' && vShort.data.integrateur === 'cadre', JSON.stringify({ f: vShort.data.format, i: vShort.data.integrateur }));
+    check('la miniature rangée pour un Short est portrait, ou il n’y en a pas', vShort.data.miniature_site === null || (typeof vShort.data.miniature_site === 'string' && /^\/uploads\//.test(vShort.data.miniature_site)), JSON.stringify({ m: vShort.data.miniature_site, a: (vShort.data.avertissement || '').slice(0, 40) }));
+    await J('PUT', '/api/admin/produits/' + p0.id, { video_url: 'https://www.youtube.com/shorts/dQw4w9WgXcQ', video_miniature: vShort.data.miniature_site || '' }, tok);
+    const shortPublic = (await J('GET', '/api/produits/' + p0.id)).data;
+    check('la fiche cliente ne reçoit jamais une miniature à bandes noires', shortPublic.video.format === 'vertical' && (shortPublic.video.miniature === null || shortPublic.video.miniature.startsWith('/uploads/')), JSON.stringify({ min: shortPublic.video.miniature }));
+    const htmlShort = await (await fetch(BASE + '/produit/' + p0.id)).text();
+    const carteShort = /<a class="vod-cart vertical"[\s\S]{0,700}?<\/a>/.exec(htmlShort);
+    check('la carte du Short est marquée vertical et vide d’image si aucune portrait n’existe', !!carteShort && (shortPublic.video.miniature !== null || !/vod-img/.test(carteShort[0])), carteShort ? carteShort[0].replace(/\s+/g, ' ').slice(0, 84) : 'carte absente');
+    const brutListe = await J('GET', '/api/admin/produits', undefined, tok);
+    const lignesAdmin = Array.isArray(brutListe.data) ? brutListe.data : (brutListe.data?.data || brutListe.data?.produits || []);
+    const avecMarque = lignesAdmin.filter((r) => r.video);
+    check('la liste du vendeur porte la marque « vidéo / Short » pour chaque article concerné', avecMarque.length >= 1 && avecMarque.every((r) => r.video.format && typeof r.video.miniature_du_site === 'boolean' && r.video_url), JSON.stringify({ lignes: lignesAdmin.length, marquées: avecMarque.map((r) => [r.id, r.video.format, r.video.miniature_du_site]) }));
+    await J('PUT', '/api/admin/produits/' + p0.id, { video_url: '', video_miniature: '' }, tok);
     const vCourt = await J('POST', '/api/admin/video-info', { url: 'https://vm.tiktok.com/ZM6abcDe/' }, tok);
     check('un lien raccourci est accepté mais annoncé comme non intégrable', vCourt.data.ok && vCourt.data.fournisseur === 'raccourci' && vCourt.data.integrateur === 'lien', JSON.stringify(vCourt.data).slice(0, 90));
     await J('PUT', '/api/admin/produits/' + p0.id, { video_url: 'https://vm.tiktok.com/ZM6abcDe/' }, tok);

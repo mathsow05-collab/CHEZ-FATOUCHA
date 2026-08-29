@@ -1192,14 +1192,14 @@ function carteVideo(p, images) {
       <div class="small muted">Vidéo de l’article réel, filmée par la boutique.</div></div>`;
   }
   if (!v.cadre) {
-    return `<a class="vod-cart" href="${esc(v.page)}" target="_blank" rel="noopener" data-vod aria-label="Lire la vidéo de l’article (chez le fournisseur)">
+    return `<a class="vod-cart${v.format === 'vertical' ? ' vertical' : ''}" href="${esc(v.page)}" target="_blank" rel="noopener" data-vod aria-label="Lire la vidéo de l’article (chez le fournisseur)">
       <span class="vod-mini">${v.miniature ? `<img class="vod-img" src="${esc(v.miniature)}" alt="" loading="lazy" decoding="async" />` : ''}<span class="vod-play">${icone('lecture', { taille: 15 })}</span></span>
       <span class="vod-legende">Vidéo de l’article · chez le fournisseur<span class="vod-duree">s’ouvre dans un onglet</span></span>
     </a>`;
   }
-  return `<a class="vod-cart" href="${esc(v.page)}" target="_blank" rel="noopener" data-vod
+  return `<a class="vod-cart${v.format === 'vertical' ? ' vertical' : ''}" href="${esc(v.page)}" target="_blank" rel="noopener" data-vod
      aria-label="Lire la vidéo de l’article (${esc(v.etiquette)})">
-    <span class="vod-mini">${v.miniature ? `<img class="vod-img" src="${esc(v.miniature)}" alt="" loading="lazy" decoding="async" />` : `<img class="vod-img" src="${esc(repli)}" alt="" loading="lazy" decoding="async" />`}<span class="vod-play">${icone('lecture', { taille: 15 })}</span></span>
+    <span class="vod-mini">${v.miniature ? `<img class="vod-img" src="${esc(v.miniature)}" alt="" loading="lazy" decoding="async" />` : ''}<span class="vod-play">${icone('lecture', { taille: 15 })}</span></span>
     <span class="vod-legende">Vidéo de l’article · ${esc(v.etiquette)}<span class="vod-duree">au toucher</span></span>
   </a>`;
 }

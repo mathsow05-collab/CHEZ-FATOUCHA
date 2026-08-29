@@ -39,7 +39,13 @@ const FOURNISSEURS = [
     hotes: /^(www\.)?(youtube\.com|youtu\.be|m\.youtube\.com)$/,
     page: (id) => `https://www.youtube.com/watch?v=${id}`,
     cadre: (id) => `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1`,
+    /* `hqdefault` existe toujours mais cadre le Short dans 480×360 avec deux
+       barres noires ; `oardefault` est l'image au format d'origine (1080×1920,
+       sans barres) mais YouTube répond parfois 404 — avec une vignette grise
+       dedans. On ne montre donc oardefault qu'après l'avoir téléchargée et
+       vérifiée (voir `miniatureVerticale` dans les routes admin). */
     miniature: (id) => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+    miniatureOriginale: (id) => `https://i.ytimg.com/vi/${id}/oardefault.jpg`,
     format: (u, id) => (/^\/shorts\//.test(u.pathname) ? 'vertical' : 'paysage'),
     etiquette: 'YouTube',
   },
@@ -179,6 +185,7 @@ function analyser(lien) {
       page: f.page(id, u),
       cadre: f.cadre(id),
       miniature: f.miniature ? f.miniature(id) : null,
+      miniature_originale: f.miniatureOriginale ? f.miniatureOriginale(id) : null,
       format: f.format(u, id),
     };
   }

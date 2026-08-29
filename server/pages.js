@@ -152,7 +152,7 @@ function blocVideo(p, images) {
      JavaScript, ou une connexion trop mauvaise pour un cadre. */
   const marque = v.cadre ? ech(v.etiquette) : 'chez le fournisseur';
   const facon = v.cadre ? 'au toucher' : 's’ouvre dans un onglet';
-  return `<a class="vod-cart" href="${ech(v.page)}" target="_blank" rel="noopener" data-vod
+  return `<a class="vod-cart${v.format === 'vertical' ? ' vertical' : ''}" href="${ech(v.page)}" target="_blank" rel="noopener" data-vod
      aria-label="Lire la vidéo de l’article (${marque})">
     <span class="vod-mini">${vignette}<span class="vod-play">${icone('lecture', { taille: 15 })}</span></span>
     <span class="vod-legende">Vidéo de l’article · ${marque}<span class="vod-duree">${facon}</span></span>

@@ -254,7 +254,13 @@ function videoDe(row) {
   if (!brut) return null;
   const a = videos.analyser(brut);
   if (!a.ok) return { brut, fournisseur: 'inconnu', etiquette: 'lien', page: brut, cadre: null, miniature: null, format: 'libre' };
-  const miniature = row.video_miniature || a.miniature || null;
+  /* Une vidéo verticale dont on n'a PAS rapatrié la miniature au format d'origine
+     reste sans image : celle de YouTube est un 480×360 entouré de deux barres
+     noires, et sur une fiche à 64 px on ne voit plus l'article — c'est
+     exactement « le Short ne s'affiche pas ». Le sceau de lecture suffit. */
+  const miniature = row.video_miniature
+    || (a.format === 'vertical' ? null : a.miniature)
+    || null;
   return {
     brut,
     fournisseur: a.fournisseur,

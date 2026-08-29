@@ -534,14 +534,38 @@ router.post('/video-info', async (req, res) => {
     miniature_site: null,
   };
   if (a.miniature) {
-    /* trois tailles de la miniature, pour que la galerie n'attende pas un tiers */
-    reponse.miniatures = [a.miniature];
-    try {
-      const nom = await optima.reduire(IMG_DIR, await scrape.telechargerImage(a.miniature, IMG_DIR));
-      reponse.miniature_site = '/uploads/produits/' + nom;
-      require('../rechauffage').apresUpload(reponse.miniature_site);
-    } catch (e) {
-      reponse.avertissement = 'Miniature non récupérée (' + String(e.message || 'échec').slice(0, 60) + ') : celle de ' + a.etiquette + ' sera utilisée.';
+    /* Pour un format vertical, on tente d'abord l'image au format d'origine
+       (1080×1920, sans barres). Deux refus possibles, et on les teste vraiment :
+       le 404 de YouTube renvoie une vignette grise, et une image trop proche du
+       16:9 trahit un cadrage barré. Sans preuve, on garde hqdefault. */
+    /* Un Short ne se range pas avec son image 16:9 : YouTube la livre entourée de
+       deux bandes noires, et sur la carte la robe devient invisible. On n'accepte
+       donc qu'une image réellement portrait — sinon on ne range rien, et la fiche
+       garde le sceau de lecture sur fond d'encre. */
+    const candidates = a.format === 'vertical'
+      ? (a.miniature_originale ? [a.miniature_originale] : [])
+      : [a.miniature];
+    reponse.miniatures = a.format === 'vertical' && a.miniature_originale ? [a.miniature_originale, a.miniature] : [a.miniature];
+    for (const adresse of candidates) {
+      try {
+        const fichier = await scrape.telechargerImage(adresse, IMG_DIR);
+        if (a.format === 'vertical') {
+          /* `telechargerImage` rend un nom, pas un chemin : c'est dans IMG_DIR qu'il faut lire */
+          const m = await require('sharp')(path.join(IMG_DIR, fichier), { failOn: 'none' }).metadata();
+          if (!(m.height > m.width)) {
+            fs.unlinkSync(path.join(IMG_DIR, fichier));
+            throw new Error('cadrage non portrait (' + m.width + '×' + m.height + ')');
+          }
+        }
+        const nom = await optima.reduire(IMG_DIR, fichier);
+        reponse.miniature_site = '/uploads/produits/' + nom;
+        require('../rechauffage').apresUpload(reponse.miniature_site);
+        break;
+      } catch (e) {
+        reponse.avertissement = a.format === 'vertical'
+          ? 'YouTube ne fournit pas d’image portrait pour ce Short (' + String(e.message || 'échec').slice(0, 46) + ') : la fiche garde le sceau de lecture, sans bandes noires.'
+          : 'Miniature non récupérée (' + String(e.message || 'échec').slice(0, 60) + ') : celle de ' + a.etiquette + ' sera utilisée.';
+      }
     }
   }
   return res.json(reponse);
