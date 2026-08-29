@@ -47,12 +47,14 @@ function images(dossier, acc = []) {
   let sauts = 0;
   const t0 = Date.now();
   for (const abs of fichiers) {
-    /* le 1200 px n'est demandé qu'en loupe, d'un clic : il reste calculé à la
-       demande. Réglable sans toucher au code : PRECUIRE="220,480" si un build
-       est trop long sur une petite instance. */
+    /* TOUTES les largeurs, y compris le 1200 px : le bandeau de l'accueil et la
+       loupe de la fiche le réclament sur écran d'ordinateur, et une variante qui
+       n'est pas cuite d'avance se paie en secondes d'attente (mesuré : 23 s sur
+       l'instance gratuite, le CPU y est bridé). Réglable sans toucher au code si
+       un build devient trop long : PRECUIRE="220,480,900". */
     const largeurs = (process.env.PRECUIRE || '')
       .split(',').map((x) => Number(x.trim())).filter((x) => optima.LARGEURS.includes(x));
-    for (const largeur of (largeurs.length ? largeurs : optima.LARGEURS.filter((l) => l < 1200))) {
+    for (const largeur of (largeurs.length ? largeurs : optima.LARGEURS)) {
       for (const format of ['avif', 'webp']) {
         const cle = optima.cleDeCache(abs, largeur, format, optima.CACHE_BUILD);
         if (fs.existsSync(cle)) { deja++; continue; }

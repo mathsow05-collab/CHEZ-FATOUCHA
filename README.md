@@ -245,11 +245,12 @@ pendant que les suivantes ne voyaient rien du tout.
 Trois choses ont été faites :
 
 1. **`npm run images:prepare`** (joué par `buildCommand` sur Render, donc pendant
-   la construction) pré-cuit 220/480/900 px pour tous les visuels livrés, dans
-   `.img-cache/`. La clé de cache est calculée sur un chemin *relatif au dépôt* :
+   la construction) pré-cuit **les quatre largeurs** (220/480/900/1200 px, en
+   AVIF et WebP) de tous les visuels livrés, dans `.img-cache/` — 216 fichiers,
+   3,7 Mo, un peu plus d'une minute de build. La clé de cache est calculée sur un chemin *relatif au dépôt* :
    le serveur qui tourne dans un autre répertoire retrouve les mêmes fichiers.
    Une variante déjà cuite est sautée → le build ne coûte que le premier coup
-   (~1 Mo, ~1 min).
+   (~1 min de build pour 216 variantes, 3,7 Mo).
 2. **Réchauffage au démarrage** (`server/rechauffage.js`) : ce que le build ne
    peut pas connaître (photos téléversées, variants manquants) est fabriqué en
    tâche de fond, deux à la fois, après l'ouverture du port — jamais devant une

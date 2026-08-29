@@ -21,7 +21,9 @@ const optima = require('./optima');
 const PETITES = [220, 480];        /* vignettes des cartes et des rails : ce que voit l'accueil */
 const GRANDES = [900];             /* photo principale d'une fiche */
 /* Combien d'articles préparer, et combien d'entre eux ont aussi leur grande
-   photo d'office. Réglable sans toucher au code : RECHAUFFE_NB / RECHAUFFE_GRAND. */
+   photo d'office. Réglable sans toucher au code : RECHAUFFE_NB / RECHAUFFE_GRAND.
+   Le 1200 px n'est pas dans cette liste : il n'est demandé qu'en loupe, d'un
+   clic, et il est de toute façon pré-cuit au build pour les visuels livrés. */
 const MAX_ARTICLES = Number(process.env.RECHAUFFE_NB || 16) || 16;
 const GRAND = Number(process.env.RECHAUFFE_GRAND || 8);
 const CONCORDANCE = 2;             /* deux conversions à la fois : le reste attend la place */
@@ -136,7 +138,7 @@ function apresUpload(url) {
       if (!optima.disponible || !optima.disponible()) return;
       const abs = optima.fichierSource(String(url || ''));
       if (!abs) return;
-      for (const largeur of PETITES.concat(GRANDES)) {
+      for (const largeur of PETITES.concat(GRANDES, [1200])) {
         for (const format of ['avif', 'webp']) {
           try { await optima.generer(abs, largeur, format); } catch { /* on laisse la demande la faire */ }
           await new Promise((r) => setImmediate(r));
