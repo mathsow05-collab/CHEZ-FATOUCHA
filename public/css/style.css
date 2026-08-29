@@ -2,6 +2,46 @@
    CHEZ FATOUCHA — feuille de style unique (mobile-first)
    Thème « douce & féminine » : rose poudré, prune, lilas, or champagne.
    ============================================================ */
+/* ---------- polices auto-hébergées (aucun appel externe) ----------
+   Deux variables logées dans public/media/polices : Fraunces (titres, axes
+   wght/opsz/SOFT/WONK) et Manrope (texte). Le thème « serif Didot/Hoefler »
+   ne rendait QUE sur macOS — sur Android, Windows et Linux, c'était le serif
+   par défaut du navigateur qui jouait les titres : d'où l'aspect « écrit à la
+   main » et les graisses incohérentes. font-display: swap = texte lisible
+   immédiatement, la police arrive juste derrière. */
+@font-face {
+  font-family: 'Fraunces Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('/media/polices/fraunces-latin-standard-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0152-0153, U+02BB-02BC, U+2000-206F, U20AC, U2122, U2212;
+}
+@font-face {
+  font-family: 'Fraunces Variable';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('/media/polices/fraunces-latin-standard-italic.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0152-0153, U+02BB-02BC, U+2000-206F, U20AC, U2122, U2212;
+}
+@font-face {
+  font-family: 'Manrope Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url('/media/polices/manrope-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0152-0153, U+02BB-02BC, U+2000-206F, U20AC, U2122, U2212;
+}
+@font-face {
+  font-family: 'Manrope Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url('/media/polices/manrope-latin-ext-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA, U+0304, U+0308, U+1E00-1E9F, U+2020, U+20A0-20AB;
+}
+
 :root {
   /* ===== Thème « PRESTIGE » — ivoire, encre aubergine, or champagne =====
      Les noms historiques (--rose, --paper, --ink…) restent valables : ce sont
@@ -50,15 +90,42 @@
   --sh: 0 1px 0 rgba(36, 26, 34, .03), 0 26px 50px -34px rgba(36, 26, 34, .3);
   --sh-lg: 0 44px 88px -44px rgba(36, 26, 34, .5);
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --serif: "Hoefler Text", Didot, "Didot LT STD", "Cormorant Garamond", "Iowan Old Style", Palatino, Georgia, serif;
+  --sans: "Manrope Variable", "Manrope", -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --serif: "Fraunces Variable", "Fraunces", "Hoefler Text", Didot, "Iowan Old Style", Palatino, Georgia, serif;
+  --titre-opsz: clamp(20px, 4vw, 80px);   /* taille optique du serif : plus c'est grand, plus c'est fin */
+  --eased: cubic-bezier(.22, .9, .24, 1);
+  --eased-out: cubic-bezier(.16, 1, .3, 1);
   --caps: .16em;
+  /* variables pilotées par le JavaScript (mouvement) — définies ici pour que la
+     page soit correcte même avant la première frame, et vérifiées par check:css */
+  --sx: 50%;        /* spotlight : position horizontale de la lumière */
+  --sy: 26%;        /* spotlight : position verticale                   */
+  --gx: 50;         /* glare : départ du reflet                         */
+  --mx: 0;          /* magnet : déplacement horizontal du bouton        */
+  --my: 0;          /* magnet : déplacement vertical                    */
+  --i: 0;           /* révélation : rang dans la cascade (0 → 7)        */
+  --dx: 0px;        /* vol vers le panier : distance à parcourir (x)    */
+  --dy: 0px;        /* vol vers le panier : distance à parcourir (y)    */
+  --p: 0;           /* jauge de lecture : 0 → 1                         */
+  --ico: 20px;      /* taille d'une icône                                 */
 }
 * { box-sizing: border-box }
 html, body { margin: 0; padding: 0 }
+/* `overflow-x: clip` (et non hidden) : une seule ligne qui déborde ne doit plus
+   élargir le document entier — c'était le cas sur mobile, tout le site se
+   retrouvait dans une colonne de 390 px posée sur un canevas de 682 px. */
+html { overflow-x: clip; scroll-behavior: smooth }
 body { font-family: var(--sans); font-size: 15px; color: var(--ink);
-  background: var(--paper); -webkit-font-smoothing: antialiased; line-height: 1.62; letter-spacing: .004em }
-img { max-width: 100%; display: block }
+  background: var(--paper); -webkit-font-smoothing: antialiased; line-height: 1.62; letter-spacing: .004em;
+  font-variation-settings: 'wght' 450; text-rendering: optimizeLegibility;
+  -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highlight-color: transparent;
+  overflow-x: clip }
+/* height:auto ici, c'est la correction de l'image « étirée » : width/height sont
+   sur la balise pour éviter le saut de mise en page, mais sans cette ligne le
+   navigateur garde la hauteur de l'attribut et étire la photo. */
+img { max-width: 100%; height: auto; display: block }
+svg { height: auto }
+:focus-visible { outline: 2px solid var(--or); outline-offset: 3px; border-radius: 1px }
 button, input, select, textarea { font: inherit; color: inherit }
 a { color: inherit; text-decoration: none }
 h1, h2, h3, h4 { margin: 0 0 .5em; line-height: 1.12; letter-spacing: -.012em; font-weight: 400 }
@@ -97,8 +164,13 @@ header.top { position: sticky; top: 0; z-index: 40; background: rgba(247, 243, 2
 .brand .logo { width: 42px; height: 42px; border-radius: 2px; display: grid; place-items: center;
   background: var(--encre); color: var(--or-clair); font-family: var(--serif); font-size: 15px; letter-spacing: .06em;
   box-shadow: inset 0 0 0 1px rgba(184, 145, 47, .55) }
-.brand b { font-family: var(--serif); font-size: 16px; letter-spacing: .24em; font-weight: 400; text-transform: uppercase; display: block }
-.brand small { display: block; font-size: 9.5px; color: var(--or-2); letter-spacing: .22em; font-weight: 650; text-transform: uppercase; margin-top: 3px }
+.brand b { font-family: var(--serif); font-size: 16px; letter-spacing: .2em; font-weight: 500; text-transform: uppercase;
+  line-height: 1.2; background: none; height: auto; color: var(--encre);
+  display: block; max-width: min(46vw, 30ch); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-variation-settings: 'opsz' 40, 'wght' 500 }
+.brand small { display: block; font-size: 9.5px; color: var(--or-2); letter-spacing: .22em; font-weight: 650;
+  text-transform: uppercase; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.brand > span { min-width: 0 }
 nav.main { display: flex; gap: 26px; margin-left: 18px }
 nav.main a { padding: 6px 1px; font-size: 11.5px; font-weight: 600; color: var(--ink-2); text-transform: uppercase; letter-spacing: var(--caps); border-bottom: 1px solid transparent; border-radius: 0 }
 nav.main a:hover { background: transparent; color: var(--ink); border-bottom-color: var(--filet-2) }
@@ -122,8 +194,10 @@ nav.main a.on { background: transparent; color: var(--ink); border-bottom-color:
   color: #f3ebe3; border: 1px solid rgba(184, 145, 47, .3); box-shadow: var(--sh-lg) }
 .hero .inner::after { content: ''; position: absolute; inset: 0; opacity: 1; pointer-events: none;
   background-image: repeating-linear-gradient(115deg, transparent 0 46px, rgba(217, 185, 104, .05) 46px 47px); }
-.hero h1 { font-size: clamp(30px, 5.4vw, 52px); margin: 0 0 14px; max-width: 17ch; font-weight: 400 }
-.hero h1 { font-family: var(--serif); font-weight: 600; letter-spacing: -.015em }
+.hero h1 { font-family: var(--serif); font-size: clamp(31px, 6vw, 58px); margin: 0 0 16px; max-width: 17ch;
+  font-weight: 500; letter-spacing: -.02em; line-height: 1.03;
+  font-variation-settings: 'opsz' 90, 'SOFT' 20, 'WONK' 1, 'wght' 520;
+  text-wrap: balance }
 .hero h1 em { font-style: italic; color: var(--or-clair) }
 .hero p { margin: 0 0 24px; max-width: 44ch; color: #d3c3c9; font-size: 15px; line-height: 1.7 }
 .hero .cta { display: flex; gap: 12px; flex-wrap: wrap; position: relative; z-index: 2 }
@@ -168,8 +242,27 @@ section.blk { padding: 34px 0 }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 32px 22px }
 .card { background: transparent; border: 0; border-radius: 0; overflow: visible; display: flex; flex-direction: column; cursor: pointer; transition: opacity .2s ease }
+
+/* --- rails horizontaux : on sait qu'on peut pousser, ça ne coupe plus net --- */
+.rang { position: relative }
+.rang-lignes { scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 4px }
+.rang-lignes::-webkit-scrollbar { display: none }
+.rang-lignes > .card { scroll-snap-align: start }
+.rang::after { content: ''; position: absolute; top: 0; right: -1px; bottom: 0; width: 54px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--paper) 78%); opacity: .95; transition: opacity .25s ease }
+.rang.fin::after { opacity: 0 }
+.rang-flèches { position: absolute; right: 6px; top: -46px; display: flex; gap: 6px; z-index: 3 }
+.rang-flèches button { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--filet-2);
+  background: var(--nacre); border-radius: 2px; cursor: pointer; color: var(--encre-2);
+  transition: border-color .2s var(--eased), color .2s var(--eased), transform .2s var(--eased) }
+.rang-flèches button:hover { border-color: var(--or); color: var(--bordeaux-2) }
+.rang-flèches button:active { transform: scale(.94) }
+.rang-flèches button[disabled] { opacity: .34; cursor: default }
 .card:hover { box-shadow: none; transform: none; border-color: transparent }
-.card .ph { position: relative; aspect-ratio: 3 / 4; background: var(--ivoire-2); overflow: hidden; border-radius: 2px }
+.card .ph { position: relative; aspect-ratio: 3 / 4; background: var(--ivoire-2); overflow: hidden; border-radius: 2px;
+  container-type: inline-size }
+.card.compact .t, .card.compact .mini { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2;
+  -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis }
 .card .ph img { width: 100%; height: 100%; object-fit: cover; transition: transform .6s cubic-bezier(.2,.6,.2,1) }
 .card .flags { position: absolute; top: 10px; left: 10px; display: grid; gap: 6px; justify-items: start }
 .flag { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; padding: 4px 8px; border-radius: 1px; background: rgba(255, 253, 250, .94); color: var(--ink); border: 1px solid var(--filet-2) }
@@ -216,7 +309,9 @@ section.blk { padding: 34px 0 }
 .qty span { min-width: 44px; text-align: center; font-weight: 600; letter-spacing: .04em }
 .info-lines { display: grid; gap: 10px; padding: 16px 18px; border-radius: 2px; background: var(--nacre); border: 1px solid var(--line) }
 .info-lines .li { display: flex; gap: 12px; align-items: start; font-size: 13.5px; line-height: 1.55 }
-.info-lines .li i { font-style: normal; font-size: 15px; line-height: 1.4; color: var(--or-2) }
+.info-lines .li { align-items: start }
+.info-lines .li i { font-style: normal; display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 auto;
+  border: 1px solid var(--filet); border-radius: 2px; color: var(--or-2); background: var(--nacre) }
 .bloc { background: var(--nacre); border: 1px solid var(--line); border-radius: 2px; padding: 20px }
 .bloc h3 { font-size: 17px; font-family: var(--serif); font-weight: 400; letter-spacing: .01em }
 
@@ -277,8 +372,16 @@ textarea.inp { min-height: 78px; resize: vertical; border-radius: var(--r) }
 .tl .st p { margin: 3px 0 0; font-size: 12.5px; color: var(--muted) }
 
 /* ---------- mobile bar ---------- */
-.mobar { position: sticky; bottom: 0; z-index: 45 }
-.mobar .in { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); background: rgba(247, 243, 236, .96); backdrop-filter: blur(10px); border-top: 1px solid var(--line) }
+.mobar { position: sticky; bottom: 0; z-index: 45; pointer-events: none }
+.mobar .in { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center;
+  margin: 0 auto 10px; padding: 7px 7px calc(7px + env(safe-area-inset-bottom)); width: min(calc(100% - 24px), 420px);
+  background: rgba(255, 253, 250, .92); backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid rgba(184, 145, 47, .34); border-radius: 999px; pointer-events: auto;
+  box-shadow: 0 18px 40px -22px rgba(36, 26, 34, .55) }
+.mobar .in .btn { height: 42px; border-radius: 999px }
+.mobar .in .btn.ghost { border-color: transparent; background: transparent }
+.mobar[data-reduit="1"] .in { width: auto; justify-content: center }
+@media (max-width: 420px) { .mobar .in { grid-template-columns: 1fr 1fr } }
 @media (min-width: 900px) { .mobar { display: none } }
 
 /* ---------- footer ---------- */
@@ -317,7 +420,8 @@ footer.ft .cols { display: grid; gap: 20px; grid-template-columns: 1fr }
 .sw { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 650 }
 .sw input { width: 40px; height: 22px; accent-color: var(--terra) }
 .empty { text-align: center; padding: 44px 18px; color: var(--muted) }
-.empty .big { font-size: 34px; opacity: .5; font-family: var(--serif) }
+.empty .big { font-size: 34px; opacity: .55; font-family: var(--serif); display: grid; place-items: center; margin: 0 auto 12px;
+  width: 82px; height: 82px; border: 1px solid var(--filet); border-radius: 50%; background: var(--ivoire-2); color: var(--or-2) }
 
 @media (max-width: 520px) {
   .grid { grid-template-columns: repeat(2, 1fr); gap: 10px }
@@ -326,6 +430,180 @@ footer.ft .cols { display: grid; gap: 20px; grid-template-columns: 1fr }
   .hero .inner { padding: 22px 16px; border-radius: 20px }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important } }
+
+
+/* ============================================================
+   MOUVEMENT & FINITIONS — vocabulaire emprunté aux bibliothèques
+   d'effets (spotlight, glare, shiny, magnet, scroll reveal, dock),
+   réécrit en CSS + ~60 lignes de JS : pas de dépendance, pas de
+   bibli de 40 Ko pour un survol, et `prefers-reduced-motion` honoré.
+   ============================================================ */
+
+/* --- icônes animées (jeu maison, voir public/js/icones.js) --- */
+.ico { --ico: 20px; display: inline-grid; place-items: center; width: var(--ico); height: var(--ico); flex: 0 0 auto; line-height: 0; vertical-align: -.28em }
+.ico svg { width: 100%; height: 100%; display: block; overflow: visible }
+.ico svg * { transform-box: fill-box; transform-origin: 50% 50%;
+  transition: transform .34s var(--eased), opacity .22s ease, stroke-width .2s ease, fill .26s ease }
+.icon-btn:hover .ico-recherche svg [data-cible=a] { transform: translate(1.2px, 1.2px) }
+.icon-btn:hover .ico-panier svg [data-cible=b] { transform: translateY(-1.6px) }
+.icon-btn:hover .ico-panier svg [data-cible=a] { transform: scaleY(1.05) }
+.ico-coeur:hover svg [data-cible=a] { transform: scale(1.12) }
+.cœur.on .ico-coeur svg [data-cible=a] { fill: var(--bordeaux); stroke: var(--bordeaux); animation: bat .52s var(--eased) }
+@keyframes bat { 30% { transform: scale(1.32) } 60% { transform: scale(.94) } 100% { transform: scale(1) } }
+[data-anim="dessin"] svg [data-cible=a] { stroke-dasharray: 26; stroke-dashoffset: 26 }
+[data-anim="dessin"].dessin svg [data-cible=a] { stroke-dashoffset: 0; transition: stroke-dashoffset .5s .05s var(--eased) }
+.ico-camion:hover svg [data-cible=a], .ico-camion[data-etat=roule] svg [data-cible=a] { transform: translateX(1.4px) }
+.ico-camion:hover svg [data-cible^=r], .ico-camion[data-etat=roule] svg [data-cible^=r] { animation: roue .9s linear infinite }
+@keyframes roue { to { transform: rotate(360deg) } }
+.ico-plus:hover svg [data-cible=a] { transform: rotate(90deg) }
+.ico-menu:hover svg [data-cible=h] { transform: scaleX(.86) }
+.ico-bas:hover svg [data-cible=a] { transform: translateY(2px) }
+.ico-bas:hover svg [data-cible=b] { transform: translateY(2.6px) }
+.ico-fleche:hover svg [data-cible=a] { transform: scaleX(1.14) }
+.ico-fleche:hover svg [data-cible=b] { transform: translateX(2.4px) }
+.ico-alerte:hover svg [data-cible=a] { animation: balance .62s ease-in-out }
+@keyframes balance { 20% { transform: rotate(11deg) } 55% { transform: rotate(-8deg) } 80% { transform: rotate(3deg) } }
+.ico-ondule:hover svg [data-cible=a] { animation: houle 1.5s ease-in-out infinite }
+.ico-ondule:hover svg [data-cible=b] { animation: houle 1.5s .18s ease-in-out infinite }
+@keyframes houle { 50% { transform: translateY(-1.8px) } }
+.ico-etoile[data-etat=plein] svg [data-cible=a] { fill: var(--or); stroke: var(--or-2) }
+.ico-panier[data-etat=plein] svg [data-cible=b] { transform: translateY(-2.4px) rotate(-3deg) }
+.btn:hover .ico-whatsapp svg { animation: secoue .5s ease-in-out }
+@keyframes secoue { 25% { transform: rotate(-9deg) } 50% { transform: rotate(8deg) } 75% { transform: rotate(-4deg) } }
+
+/* --- spotlight : la lumière suit le curseur sur le bloc sombre --- */
+.spot { position: relative; isolation: isolate }
+.spot::before { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0;
+  transition: opacity .4s ease; border-radius: inherit;
+  background: radial-gradient(360px circle at var(--sx, 50%) var(--sy, 30%), rgba(217, 185, 104, .18), transparent 62%) }
+.spot:hover::before, .spot:focus-within::before { opacity: 1 }
+
+/* --- glare : le reflet qui traverse la carte au survol --- */
+.glare { position: relative; overflow: hidden; isolation: isolate }
+.glare::after { content: ''; position: absolute; inset: -40%; z-index: 4; pointer-events: none; opacity: 0;
+  background: linear-gradient(104deg, transparent 42%, rgba(255, 255, 255, .58) 50%, transparent 58%);
+  transform: translate3d(calc(var(--gx, 50) * 1%), 0, 0); transition: opacity .3s ease }
+.glare:hover::after { opacity: .8; animation: traverse 1.15s var(--eased) both }
+@keyframes traverse { from { transform: translate3d(-72%, 0, 0) } to { transform: translate3d(72%, 0, 0) } }
+
+/* --- shiny : le filet de lumière sur les micro-labels dorés --- */
+.shiny { position: relative; overflow: hidden; background-image: linear-gradient(100deg, var(--or-2) 20%, #f0d99a 42%, var(--or-2) 62%);
+  background-size: 220% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: brillance 5.4s linear infinite }
+@keyframes brillance { to { background-position: -220% 0 } }
+
+/* --- magnet : le CTA s'incline vers le curseur --- */
+.magnet { transition: transform .34s var(--eased), box-shadow .3s ease; will-change: transform }
+.magnet:hover { transform: translate3d(calc(var(--mx, 0) * 1px), calc(var(--my, 0) * 1px), 0) }
+
+/* --- révélation au défilement (les blocs montent, l'un après l'autre) --- */
+/* Le masque de départ n'existe qu'une fois le JavaScript branché (classe
+   `mouv` posée par mouvement.js) : sans lui, une page dont le script échoue
+   afficherait un catalogue entièrement vide. */
+html.mouv [data-reveal]:not(.vu) { opacity: 0; transform: translate3d(0, 16px, 0) }
+html.mouv [data-reveal].vu { opacity: 1; transform: none;
+  transition: opacity .62s var(--eased-out) calc(var(--i, 0) * 65ms), transform .62s var(--eased-out) calc(var(--i, 0) * 65ms) }
+@media (prefers-reduced-motion: reduce) { html.mouv [data-reveal]:not(.vu) { opacity: 1; transform: none } }
+
+/* --- squelette : le chargement a une forme, pas un trou blanc --- */
+.squelette { position: relative; overflow: hidden; background: var(--ivoire-2); border-radius: 2px }
+/* Ce n'est jamais la photo qui est cachée — c'est le voile qui s'efface.
+   Un `<img loading="lazy">` hors écran met parfois une seconde à partir : si
+   l'image dépendait d'une classe posée par le JavaScript, elle resterait
+   invisible. Là, le cadre travaille et la photo apparaît dès qu'elle arrive. */
+html.mouv .ph.squelette::after { opacity: 1 }
+html.mouv .ph.squelette:has(img.vue)::after { opacity: 0; transition: opacity .5s ease }
+.ph.squelette img { position: relative; z-index: 1 }
+.squelette::after { content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .78), transparent);
+  transform: translateX(-100%); animation: balayage 1.35s ease-in-out infinite }
+@keyframes balayage { to { transform: translateX(100%) } }
+.squelette.photo { aspect-ratio: 3 / 4 }
+.squelette.ligne { height: 11px; margin: 7px 0 }
+
+/* --- le point qui vole au panier --- */
+.vol { position: fixed; z-index: 120; width: 16px; height: 16px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle at 32% 30%, #f0d99a, var(--or) 62%, var(--or-2));
+  box-shadow: 0 6px 18px -6px rgba(36, 26, 34, .6) }
+@keyframes voler { from { transform: translate3d(0, 0, 0) scale(1); opacity: 1 }
+  60% { opacity: 1 } to { transform: translate3d(var(--dx, 0), var(--dy, 0), 0) scale(.32); opacity: 0 } }
+
+/* --- étincelle au clic (un mini canvas, 4 traits, rien de plus) --- */
+#etincelle { position: fixed; inset: 0; z-index: 130; pointer-events: none }
+
+/* --- jauge de lecture tout en haut --- */
+.jauge { position: fixed; left: 0; top: 0; height: 2px; z-index: 140; width: 100%; transform-origin: 0 50%;
+  transform: scaleX(var(--p, 0)); background: linear-gradient(90deg, var(--or-2), var(--or-clair)); pointer-events: none }
+
+/* --- carte en vedette : liseré dégradé, pas de bordure grasse --- */
+.ornee { position: relative }
+.ornee::before { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: linear-gradient(140deg, rgba(217, 185, 104, .9), rgba(109, 31, 70, .5) 45%, rgba(217, 185, 104, .55));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude }
+
+/* --- le tiroir de navigation mobile --- */
+.tiroir-fond { position: fixed; inset: 0; z-index: 66; background: rgba(36, 26, 34, .46); backdrop-filter: blur(3px);
+  opacity: 0; pointer-events: none; transition: opacity .3s ease }
+.burger { display: none; width: 40px; height: 40px; place-items: center; border: 1px solid var(--filet-2);
+  background: var(--nacre); border-radius: 2px; cursor: pointer; color: var(--encre) }
+nav.mobile { display: none }
+@media (max-width: 899.98px) {
+  .top .bar { height: 62px; gap: 8px }
+  .brand .logo { width: 34px; height: 34px; font-size: 12px }
+  .brand b { font-size: 13px; letter-spacing: .16em; max-width: 42vw }
+  .brand small { font-size: 8.5px; letter-spacing: .18em }
+  nav.main { display: none }
+  .burger { display: grid }
+  .top .actions { gap: 6px }
+  .icon-btn { height: 40px; padding: 0 10px; gap: 6px }
+  .icon-btn .libelle { display: none }
+  .marquee .wrap { gap: 22px }
+}
+.tiroir { position: fixed; z-index: 67; top: 0; right: 0; bottom: 0; width: min(84vw, 336px); display: grid;
+  align-content: start; gap: 4px; padding: 16px 18px calc(24px + env(safe-area-inset-bottom)); overflow-y: auto;
+  background: var(--nacre); border-left: 1px solid var(--filet); visibility: hidden;
+  transform: translate3d(101%, 0, 0); transition: transform .44s var(--eased), visibility .44s }
+.tiroir .tete { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px }
+.tiroir .tete b { font-family: var(--serif); font-size: 15px; letter-spacing: .18em; text-transform: uppercase; font-weight: 500 }
+.tiroir a { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 2px;
+  border-bottom: 1px solid var(--filet); font-size: 13px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase }
+.tiroir a:hover { background: transparent; color: var(--bordeaux-2) }
+.tiroir a .ico { opacity: .6 }
+.tiroir .base { margin-top: 18px; display: grid; gap: 10px }
+body.tiroir-ouvert .tiroir { visibility: visible; transform: none; box-shadow: -30px 0 70px -30px rgba(36, 26, 34, .5) }
+body.tiroir-ouvert .tiroir-fond { opacity: 1; pointer-events: auto }
+body.tiroir-ouvert { overflow: hidden }
+.tiroir a, .tiroir .tete { opacity: 0; transform: translate3d(14px, 0, 0); transition: opacity .4s ease, transform .4s var(--eased) }
+body.tiroir-ouvert .tiroir a, body.tiroir-ouvert .tiroir .tete { opacity: 1; transform: none }
+body.tiroir-ouvert .tiroir a:nth-child(2) { transition-delay: .06s }
+body.tiroir-ouvert .tiroir a:nth-child(3) { transition-delay: .1s }
+body.tiroir-ouvert .tiroir a:nth-child(4) { transition-delay: .14s }
+body.tiroir-ouvert .tiroir a:nth-child(5) { transition-delay: .18s }
+body.tiroir-ouvert .tiroir a:nth-child(6) { transition-delay: .22s }
+
+/* --- le cadrage des photos : un ratio partout, jamais d'image étirée --- */
+.h-bloc { font-family: var(--serif); font-weight: 400; font-size: 20px; margin: 0 0 2px; letter-spacing: -.005em }
+.page-tete { background: var(--nacre); border-bottom: 1px solid var(--filet); padding: 30px 0 26px }
+.page-tete h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(26px, 4.4vw, 40px); margin: 6px 0 8px; letter-spacing: -.01em }
+.page-tete p { margin: 0; color: var(--ink-2); font-size: 14px; max-width: 62ch }
+.page-tete .sur { color: var(--or-2); }
+.hero .visuel { aspect-ratio: 3 / 4 }
+.gallery .main img, .thumbs img { object-position: center 30% }
+
+/* --- le texte des cartes et des fiches respire (plus de collisions) --- */
+.card .t { text-wrap: pretty }
+.grid { gap: 14px }
+@media (max-width: 520px) {
+  .grid { gap: 10px }
+  .wrap { padding: 0 16px }
+  .hero .inner { padding: 24px 18px }
+  .brand b { max-width: 38vw }
+}
+
+/* --- le scroll doux n'écrase pas les ancres sous l'en-tête collant --- */
+[id] { scroll-margin-top: 86px }
+
 
 /* ---------- finitions « Prestige » ---------- */
 h2, h3 { font-family: var(--serif); font-weight: 400; letter-spacing: -.006em }
@@ -414,7 +692,25 @@ h2, h3 { font-family: var(--serif); font-weight: 400; letter-spacing: -.006em }
 
 /* --- tailles --- */
 .puce-mannequin { font-size: 12.5px; color: var(--encre-2); background: var(--ivoire-2); border-left: 2px solid var(--or); padding: 9px 12px; letter-spacing: .01em }
-.opt-aide { display: flex; gap: 18px; flex-wrap: wrap }
+.opt-aide { display: flex; gap: 8px 18px; flex-wrap: wrap }
+.opt-aide .link { display: inline-flex; align-items: center; gap: 7px }
+.puce-mannequin { display: flex; align-items: center; gap: 8px }
+.link .ico, .btn .ico, .cat .ico, .icon-btn .ico, .close .ico { vertical-align: middle }
+a.link, button.link { display: inline-flex; align-items: center; gap: 7px }
+.blk-head .link .ico { transition: transform .3s var(--eased) }
+.blk-head .link:hover .ico { transform: translateX(3px) }
+.card { transition: opacity .2s ease, transform .22s var(--eased) }
+.card.touche { transform: scale(.988) }
+.sceau { width: 76px; height: 76px; margin: 0 auto 16px; display: grid; place-items: center; border-radius: 50%;
+  color: var(--or-2); background: radial-gradient(circle at 32% 26%, #fdf6e4, #f0e2c4 62%, #e4d0a2);
+  border: 1px solid rgba(184, 145, 47, .45); box-shadow: 0 16px 34px -20px rgba(184, 145, 47, .8) }
+.cat { display: inline-flex; align-items: center; gap: 7px }
+.cat .em { font-size: 13px; line-height: 1; opacity: .85 }
+.cat .em:empty { display: none }
+.add-mini .ico, .cœur .ico { display: block }
+/* les tiroirs et boutons de la barre du haut n'ont plus de texte sur mobile :
+   .libelle est posé pour ça, et reste lu par les lecteurs d'écran */
+.icon-btn .libelle { font-size: 11px; letter-spacing: var(--caps) }
 .guide-box summary { cursor: pointer; font-size: 12.5px; letter-spacing: .02em; color: var(--bordeaux); list-style: none }
 .guide-box summary::-webkit-details-marker { display: none }
 .guide-box summary::before { content: '+ '; color: var(--or) }
@@ -434,11 +730,14 @@ table.guide tr:last-child th, table.guide tr:last-child td { border-bottom: 0 }
 .avis-resume { display: grid; grid-template-columns: auto 1fr; gap: 22px; align-items: center; padding: 16px 18px; background: var(--nacre); border: 1px solid var(--filet); margin-bottom: 18px }
 .grosse-note b { font-family: var(--serif); font-size: 40px; font-weight: 400; line-height: 1 }
 .grosse-note span { font-size: 13px; color: var(--muted) }
-.barres { display: grid; gap: 5px }
-.bar { display: grid; grid-template-columns: 26px 1fr 20px; gap: 10px; align-items: center; font-size: 11px; color: var(--muted) }
-.bar i { display: block; height: 4px; background: var(--ivoire-2); }
-.bar b { display: block; height: 4px; background: var(--or); }
-.bar em { font-style: normal; text-align: right; color: var(--encre-2) }
+/* Histogramme des notes. Nom spécifique — et non `.bar` : la rangée de
+   l'en-tête s'appelle .bar, et un sélecteur descendant (`.bar b`) allait alors
+   écraser le nom de la boutique à 4 px de haut avec un fond doré. */
+.histo { display: grid; gap: 5px }
+.histo > div { display: grid; grid-template-columns: 26px 1fr 20px; gap: 10px; align-items: center; font-size: 11px; color: var(--muted) }
+.histo i { display: block; height: 4px; background: var(--ivoire-2) }
+.histo b { display: block; height: 4px; background: var(--or) }
+.histo em { font-style: normal; text-align: right; color: var(--encre-2) }
 .avis-liste { display: grid; gap: 14px }
 .avis-item { padding: 15px 16px; background: var(--nacre); border: 1px solid var(--filet); border-left: 2px solid var(--or-soft) }
 .avis-item header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px }

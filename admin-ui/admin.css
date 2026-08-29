@@ -116,3 +116,11 @@ body.adm { background: var(--paper) }
 .guide-grid span { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); text-align: center }
 .guide-grid .gt { font-size: 12px; font-weight: 700 }
 .guide-grid input { width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 2px; font-size: 13px; background: var(--ivoire) }
+
+/* --- les onglets et les libellés portent des icônes dessinées (voir icones.js) --- */
+.adm-tabs a { display: inline-flex; align-items: center; gap: 7px }
+.adm-tabs a .ico { flex: 0 0 auto; opacity: .75; transition: opacity .2s ease }
+.adm-tabs a:hover .ico, .adm-tabs a.on .ico { opacity: 1 }
+.private-flag { display: inline-flex; align-items: center; gap: 6px }
+.drop { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px }
+.btn .ico, .tag .ico { vertical-align: -.28em }

@@ -75,7 +75,7 @@ const J = async (method, url, body, token) => {
     check('GET /api/produits renvoie le catalogue', Array.isArray(produits.data) && produits.data.length >= 8, `(${produits.data?.length})`);
     const p0 = produits.data[0];
     check('produit : prix, images, délai, variantes', typeof p0.prix === 'number' && !!p0.image && p0.delai_jours > 0 && Array.isArray(p0.variantes));
-    check('produit : prix d’achat et lien fournisseur cachés', p0.prix_achat === undefined && p0.lien_source === undefined);
+    check('produit : prix d’achat, lien fournisseur et origine cachés', p0.prix_achat === undefined && p0.lien_source === undefined && p0.marque === undefined);
 
     const stockAvant = p0.stock;
     const detail = await J('GET', '/api/produits/' + p0.id);
@@ -169,7 +169,13 @@ const J = async (method, url, body, token) => {
     const vu = await J('GET', '/api/produits/' + idP);
     check('nouveau produit visible côté client', vu.status === 200 && vu.data.prix === 12345);
     check('stock global = somme des variantes (4)', vu.data.stock === 4, `(${vu.data.stock})`);
-    check('le client ne voit ni prix d’achat ni lien', vu.data.lien_source === undefined && vu.data.prix_achat === undefined);
+    check('le client ne voit ni prix d’achat, ni lien, ni origine', vu.data.lien_source === undefined && vu.data.prix_achat === undefined && vu.data.marque === undefined);
+    { /* la fiche rendue par le serveur ne doit pas afficher le fournisseur stocké */
+      const page = await (await fetch(BASE + '/produit/' + (vu.data.slug || vu.data.id))).text();
+      const visible = page.replace(/<head>[\s\S]*?<\/head>/, '').replace(/<script[\s\S]*?<\/script>/g, '');
+      check('la fiche ne nomme pas le fournisseur de la boutique', !/SHEIN|TEMU/.test(visible), (visible.match(/SHEIN|TEMU/) || ['aucune'])[0]);
+      check('le balisage des pages ne court pas après les places d’achat', !/SHEIN|TEMU/.test((page.match(/<meta[^>]*(keywords|description)[^>]*>/g) || []).join(' ')));
+    }
     const adminVu = await J('GET', '/api/admin/produits?q=' + encodeURIComponent('Test ensembles'), undefined, tok);
     check('l’admin voit le lien fournisseur', /shein/.test(adminVu.data[0]?.lien_source || ''), adminVu.data[0]?.lien_source);
     check('commande d’une variante épuisée (S:1, déjà 0 réservé) OK puis rupture', (await J('POST', '/api/commandes', {
@@ -287,7 +293,30 @@ const J = async (method, url, body, token) => {
     check('thème : plus aucun rose bonbon du passé', !['#d9558a', '#fdf2f6', '#fbdbe7', '#c8397a', '#6c2b4b'].some((c) => cssPub.includes(c)));
     check('thème : hero sombre à filet or, en-tête ivoire translucide', /radial-gradient\(120% 140% at 8% 0%, #3b2434/.test(cssPub) && /rgba\(184, 145, 47, \.3\)/.test(cssPub) && /rgba\(247, 243, 236, \.92\)/.test(cssPub));
     check('thème : cartes éditoriales (pas d’encadrement, zoom photo au survol)', /\.card \{ background: transparent; border: 0/.test(cssPub) && /\.card:hover \.ph img \{ transform: scale\(1\.035\) \}/.test(cssPub));
-    check('thème : typographie — titres serif, micro-labels en capitales espacées', /--serif: "Hoefler Text", Didot/.test(cssPub) && /text-transform: uppercase; letter-spacing: \.12em/.test(cssPub));
+    check('thème : typographie — serif/sans déclarées, capitales espacées', /--serif:\s*['"]Fraunces Variable['"]/.test(cssPub) && /--sans:\s*['"]Manrope Variable['"]/.test(cssPub) && /--caps:\s*\.16em/.test(cssPub) && /letter-spacing:\s*var\(--caps\)/.test(cssPub));
+    /* Les polices doivent être réellement servies : une direction typographique qui
+       retombe sur la police système n'en est pas une (c'est ce qui faisait « gribouillé »). */
+    for (const f of ['fraunces-latin-standard-normal.woff2', 'fraunces-latin-standard-italic.woff2', 'manrope-latin-wght-normal.woff2', 'manrope-latin-ext-wght-normal.woff2']) {
+      const r = await fetch(BASE + '/media/polices/' + f);
+      const n = Number(r.headers.get('content-length') || 0);
+      check(`police embarquée servie : ${f}`, r.status === 200 && n > 8000, `HTTP ${r.status} · ${n} o`);
+    }
+    check('typographie : la feuille précharge les deux polices principales', /<link rel="preload"[^>]*fraunces-latin-standard-normal\.woff2/.test(hIdx) && /<link rel="preload"[^>]*manrope-latin-wght-normal\.woff2/.test(hIdx));
+    check('jeu d’icônes SVG dessiné à la main, chargé par la boutique et le serveur', /src="\/js\/icones\.js"/.test(hIdx) && /src="\/js\/mouvement\.js"/.test(hIdx) && (await fetch(BASE + '/js/icones.js')).ok && (await fetch(BASE + '/js/mouvement.js')).ok);
+    check('aucun pictogramme coloré dans l’interface (bandeaux, fiches, panier)', !/[\u{1F300}-\u{1FAFF}\u{23F0}-\u{23FA}\u{2B00}-\u{2BFF}\u{FE0F}]/u.test(hIdx.replace(/<script[\s\S]*?<\/script>/g, '')));
+    check('le rendu serveur embarque des icônes SVG inline (pas d’emoji)', (hIdx.match(/<svg viewBox="0 0 24 24"/g) || []).length >= 5, `${(hIdx.match(/<svg viewBox="0 0 24 24"/g) || []).length} tracés`);
+    /* Le jour où la navigation ne rentrait plus dans 390 px, toute la page
+       défilait de côté : « mal cadré ». La parade est CSS — sous le point de
+       rupture, la nav horizontale s'efface au profit du bouton et du tiroir. */
+    const bornes = [...cssPub.matchAll(/@media[^{]*max-width:\s*([\d.]+)px/g)].map((m) => Number(m[1]));
+    const iNav = cssPub.indexOf('nav.main { display: none');
+    const iBurger = cssPub.indexOf('.burger { display: grid');
+    check('cadrage mobile : la nav horizontale cède la place au tiroir sous 900 px',
+      iNav > 0 && iBurger > 0 && bornes.length > 0 && bornes.some((b) => b <= 900 && b >= 760)
+      && cssPub.lastIndexOf('@media', iNav) > cssPub.lastIndexOf('}', iNav - 4000) && iBurger > iNav - 200,
+      `règles trouvées : nav@${iNav} burger@${iBurger} · bornes ${bornes.slice(0, 6).join('/')}`);
+    check('cadrage mobile : le tiroir et son bouton sont rendus par le serveur', /class="burger"/.test(hIdx) && /id="tiroir"/.test(hIdx));
+    check('cadrage : toute image garde son ratio (height:auto, jamais d’étirement)', /img\s*\{[^}]*height:\s*auto/.test(cssPub) && /svg[^{]*\{[^}]*height:\s*auto/.test(cssPub));
     check('thème : plus de gros arrondis « app mignonne »', !/border-radius: 999px;[^}]*\.btn/.test(cssPub) && /--r: 10px/.test(cssPub) && /--r-lg: 16px/.test(cssPub));
     check('thème : les styles du back-office ne sont plus servis à la boutique', !/\.adm-top|\.tbl \{/.test(cssPub));
     const fuites = [];

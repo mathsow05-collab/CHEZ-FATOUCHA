@@ -68,18 +68,28 @@ const J = async (method, url, body, token) => {
     const prod1 = (await J('GET', '/api/produits/1')).data;
     const vc = new VirtualConsole();
     const erreurs = [];
-    vc.on('jsdomError', (e) => { if (!/Not implemented/.test(e.message)) erreurs.push(e.message); });
+    /* une erreur JS « non implémentée » par jsdom (canvas, storage…) n'est pas un
+       défaut du site : on l'ignore. Toute autre erreur est retenue AVEC sa pile,
+       sinon le test dit « il y a une erreur » sans dire où. */
+    const garder = (e) => {
+      const t = (e && e.detail && e.detail.stack) || (e && e.stack) || (e && e.message) || String(e);
+      if (/Not implemented/.test(t)) return;
+      erreurs.push(t.split('\n').slice(0, 3).map((x) => x.trim()).join('  '));
+    };
+    vc.on('jsdomError', garder);
     vc.on('error', (...a) => erreurs.push(a.join(' ')));
     vc.on('warn', () => {});
 
     /* jsdom n'a pas de fetch : on branche celui de Node, en résolvant les URLs relatives. */
-    const brancher = (window) => {
+    const branchfidele = (window) => brancher(window);
+    const brancher = (window, onErreur) => {
       window.fetch = (input, init) => fetch(new URL(typeof input === 'string' ? input : input.url, BASE + '/').toString(), init);
       for (const k of ['Response', 'Request', 'Headers', 'FormData', 'Blob', 'File']) if (globalThis[k]) window[k] = globalThis[k];
       window.scrollTo = () => {};
+      if (onErreur) window.addEventListener('error', (ev) => { if (ev.error && ev.error.stack) onErreur(ev.error); });
     };
     const opts = { runScripts: 'dangerously', resources: 'usable', pretendToBeVisual: true, virtualConsole: vc };
-    dom = await JSDOM.fromURL(BASE + '/', { ...opts, beforeParse: (window) => { brancher(window); if (jetonAdmin) window.localStorage.setItem('fatoucha_admin_token', jetonAdmin); } });
+    dom = await JSDOM.fromURL(BASE + '/', { ...opts, beforeParse: (window) => { brancher(window, garder); if (jetonAdmin) window.localStorage.setItem('fatoucha_admin_token', jetonAdmin); } });
     const w = dom.window;
     w.scrollTo = () => {};
     /* la page est d'abord rendue par le serveur : on attend que le front ait pris la main */
@@ -226,8 +236,11 @@ const J = async (method, url, body, token) => {
     check('montant à payer affiché', plat(d.querySelector('.pay-hero').textContent).includes(frc(prod1.prix * qteFinale + zero.frais)), plat(d.querySelector('.pay-hero').textContent));
     check('numéro Wave de la boutique affiché', /77 000 00 00/.test(d.querySelector('.copy .num').textContent), d.querySelector('.copy .num').textContent);
     check('étapes 1-2-3-4 fournies au client', d.querySelectorAll('.steps div').length === 4);
-    check('lien WhatsApp de preuve présent', /wa\.me/.test(d.querySelector('[href*="wa.me"]')?.href || ''));
-    check('référence rappelée dans le message WhatsApp', encodeURIComponent(ref).length > 0 && /CMD/.test(decodeURIComponent(d.querySelector('[href*="wa.me"]').href)));
+    /* le tiroir mobile contient lui aussi un lien WhatsApp « général » : on cible
+       le lien qui porte un message ( ?text= ), celui qui compte ici. */
+    const lienPreuve = d.querySelector('[href*="wa.me"][href*="text="]');
+    check('lien WhatsApp de preuve présent', /wa\.me/.test(lienPreuve?.href || ''));
+    check('référence rappelée dans le message WhatsApp', !!lienPreuve && decodeURIComponent(lienPreuve.href).includes(ref), lienPreuve ? decodeURIComponent(lienPreuve.href).slice(-90) : 'aucun lien avec message');
 
     /* --- suivi client --- */
     w.go('/commande/' + ref + '?tel=771234567');
@@ -276,7 +289,12 @@ const J = async (method, url, body, token) => {
     await until(() => /CMD-/.test(da.querySelector('#admin-body')?.textContent || ''), { label: 'vue commandes' });
     check('admin : changement d’onglet par hash interne (#commandes)', wa.location.hash === '#commandes');
     check('admin : la commande du client est visible', /CMD-/.test(da.querySelector('#admin-body').textContent));
-    check('admin : statut “en attente” de paiement', /⏳ wave|en attente/.test(da.querySelector('#admin-body').textContent));
+    check('admin : statut “en attente” de paiement', /en attente|wave/.test(da.querySelector('#admin-body').textContent), plat(da.querySelector('.tag').textContent));
+    check('back-office : les pictogrammes sont passés en tracés dessinés',
+      !/[\u{1F300}-\u{1FAFF}\u{2300}-\u{23FA}\u{2B00}-\u{2BFF}\u{FE0F}]/u.test(da.body.innerHTML.replace(/<script[\s\S]*?<\/script>/g, '')),
+      (da.body.innerHTML.match(/[\u{1F300}-\u{1FAFF}\u{2300}-\u{23FA}\u{2B00}-\u{2BFF}\u{FE0F}]/gu) || []).slice(0, 8).join(' '));
+    check('back-office : les onglets portent des icônes animées', da.querySelectorAll('.adm-tabs .ico svg').length >= 6, da.querySelectorAll('.adm-tabs .ico').length);
+    check('back-office : une icône dessinée remplace le sablier du statut', !!da.querySelector('.tag .ico svg'));
     da.querySelector('[data-open]').click();
     await until(() => /Paiement reçu/.test(da.body.textContent), { label: 'détail commande' });
     check('admin : bouton de validation du paiement', /Paiement reçu/.test(da.body.textContent));
@@ -354,6 +372,23 @@ const J = async (method, url, body, token) => {
     w.go('/produit/1');
     await until(() => /portée par/i.test(d.querySelector('.puce-mannequin')?.textContent || ''), { label: 'fiche cliente rafraîchie' });
     check('admin → cliente : la réassurance saisie dans le back-office est en ligne', /portée par/i.test(d.querySelector('.puce-mannequin').textContent), d.querySelector('.puce-mannequin').textContent);
+
+    /* --- fidélité de l'hydratation : ouvrir une URL au hasard du doigt ne doit
+       pas faire « sauter » la page vers une autre. On compare le titre rendu par
+       le serveur avec celui que le JavaScript laisse après hydration. --- */
+    for (const [chemin, attendu] of [['/boutique', 'Tous les articles'], ['/faq', null], ['/suivi', null], ['/produit/robe-longue-boheme-fleurie', null]]) {
+      const brut = await (await fetch(BASE + chemin)).text();
+      const h1serveur = (brut.match(/<h1[^>]*>([\s\S]*?)<\/h1>/) || [, ''])[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      const dom2 = await JSDOM.fromURL(BASE + chemin, { ...opts, beforeParse: branchfidele });
+      try {
+        await new Promise((r) => setTimeout(r, 1800));
+        const h1client = (dom2.window.document.querySelector('h1')?.textContent || '').replace(/\s+/g, ' ').trim();
+        /* une route rendue entièrement par le client n'a pas de titre côté serveur :
+           on exige alors simplement qu'elle en ait un, propre et non vide. */
+        check(`hydratation fidèle sur ${chemin}`, h1serveur ? (h1client === h1serveur) : !!h1client, `serveur « ${h1serveur} » → client « ${h1client} »`);
+        if (attendu) check(`titre attendu sur ${chemin}`, h1serveur.includes(attendu), h1serveur);
+      } finally { try { dom2.window.close(); } catch { /* rien */ } }
+    }
 
     check('aucune erreur JS pendant tout le parcours', erreurs.length === 0, '\n     ' + erreurs.slice(0, 4).join('\n     '));
   } catch (e) {

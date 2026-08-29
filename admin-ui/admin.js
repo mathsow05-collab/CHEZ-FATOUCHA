@@ -53,14 +53,18 @@ async function aReq(method, url, body) {
 
 /* --------- coquille --------- */
 function coquille() {
-  const tabs = [['dash', '📊 Tableau de bord'], ['commandes', '📦 Commandes'], ['produits', '👗 Produits'], ['avis', '⭐ Avis'], ['contenus', '📄 Contenus'], ['zones', '🚚 Zones & délais'], ['reglages', '⚙️ Réglages'], ['entonnoir', '📈 Entonnoir']];
+  const tabs = [
+    ['dash', 'Tableau de bord', 'graphique'], ['commandes', 'Commandes', 'colis'], ['produits', 'Produits', 'robe'],
+    ['avis', 'Avis', 'etoile'], ['contenus', 'Contenus', 'document'], ['zones', 'Zones & délais', 'camion'],
+    ['reglages', 'Réglages', 'reglages'], ['entonnoir', 'Entonnoir', 'ondule'],
+  ];
   return `
   <div class="adm-shell">
     <header class="adm-top"><div class="in">
       <span class="brand"><span class="logo">${esc(monogramme())}</span><span><b>${esc(A.cfg?.nom_boutique || 'CHEZ FATOUCHA')}</b><small>Espace vendeur — privé</small></span></span>
-      <nav class="adm-tabs">${tabs.map(([k, l]) => `<a href="#${k}" class="${S.vue === k ? 'on' : ''}" data-tab="${k}">${l}</a>`).join('')}</nav>
+      <nav class="adm-tabs">${tabs.map(([k, l, ic]) => `<a href="#${k}" class="${S.vue === k ? 'on' : ''}" data-tab="${k}">${icone(ic, { taille: 16 })}<span>${l}</span></a>`).join('')}</nav>
       <div class="who">
-        <span class="private-flag">🔒 ${esc(A.who?.admin?.display_name || A.who?.admin?.username || '')}</span>
+        <span class="private-flag">${icone('cadenas', { taille: 14 })} ${esc(A.who?.admin?.display_name || A.who?.admin?.username || '')}</span>
         <a class="btn sm ghost" href="/" target="_blank" rel="noopener">Voir la boutique</a>
         <button class="btn sm ghost" data-logout>Quitter</button>
       </div>
@@ -82,7 +86,7 @@ async function dessiner() {
     const mode = document.getElementById('adm-mode');
     if (mode) mode.textContent = A.paiement_mode === 'cinetpay'
       ? ' · Paiement Wave / Orange Money automatique ✔'
-      : ' · Paiement : validation manuelle à cocher dans 📦 Commandes.';
+      : ' · Paiement : validation manuelle à cocher dans l’onglet Commandes.';
     if (S.vue === 'dash') await vueDash(body);
     else if (S.vue === 'commandes') await vueCommandes(body);
     else if (S.vue === 'produits') await vueProduits(body);
@@ -94,12 +98,33 @@ async function dessiner() {
   } catch (e) {
     if (e.message !== 'Session expirée, reconnecte-toi.') body.innerHTML = `<div class="banner ko">${esc(e.message)}</div>`;
   }
+  A_pictos();
+}
+
+/* L'espace vendeur est rempli de libellés courts (« 💾 Enregistrer », « 📤 Glisse tes
+   photos »). Plutôt que de retoucher quarante chaînes une à une — et d'en rater une —
+   on passe le HTML posé dans le même filtre que la boutique : tout pictogramme
+   coloré ressort en tracé dessiné, dans la langue graphique du thème. */
+function A_pictos(racine) {
+  if (typeof sansPictos !== 'function') return;
+  const hote = racine || document.body;
+  for (const el of hote.querySelectorAll('.btn, .drop, h1, h2, h3, .tag, .small, .private-flag, .cat, label, [data-logout]')) {
+    if (el.querySelector('.ico')) continue;
+    const net = sansPictos(el.innerHTML);
+    if (net !== el.innerHTML) el.innerHTML = net;
+  }
+  /* les « ::placeholder » ne peuvent pas contenir de dessin : on y retire
+     simplement le pictogramme, l'indication de recherche reste lisible */
+  for (const el of hote.querySelectorAll('input[placeholder], textarea[placeholder]')) {
+    const net = sansPictos(el.getAttribute('placeholder'));
+    if (net !== el.getAttribute('placeholder')) el.setAttribute('placeholder', net.replace(/<[^>]+>/g, '').trim());
+  }
 }
 
 /* --------- login --------- */
 function rendreLogin(msg) {
   A.innerHTML = `<div class="adm-login"><div class="card-box">
-    <div class="lock">🔒</div>
+    <div class="lock">${icone('cadenas', { taille: 26 })}</div>
     <h1>Espace vendeur</h1>
     <p class="sub">Réservé à la boutique — les clientes restent sur le catalogue.</p>
     <div class="stack">
@@ -117,7 +142,7 @@ function rendreLogin(msg) {
     try {
       const r = await API.post('/api/admin/login', { username: u, password: p });
       localStorage.setItem(TOKEN_KEY, r.token);
-      toast('Bonjour ' + (r.admin.display_name || r.admin.username) + ' 👋', 'ok');
+      toast('Bonjour ' + (r.admin.display_name || r.admin.username), 'ok');
       mont();
     } catch (e) {
       document.getElementById('l-err').innerHTML = `<div class="banner ko">${esc(e.message)}</div>`;
@@ -155,7 +180,7 @@ async function vueDash(body) {
           <td class="mono small">${esc(c.reference)}</td>
           <td>${esc(c.client)}<br><span class="small muted">${esc(c.telephone)} · ${c.mode === 'retrait' ? 'retrait' : 'livraison'}</span></td>
           <td><b>${fcfa(c.total)}</b></td>
-          <td><span class="tag ${c.statut_paiement}">${c.statut_paiement === 'paye' ? '✔ payé' : '⏳ ' + esc(c.paiement)}</span></td>
+          <td><span class="tag ${c.statut_paiement}">${c.statut_paiement === 'paye' ? '✔ payé' : icone('sablier', { taille: 13 }) + ' ' + esc(c.paiement)}</span></td>
           <td><span class="tag ${c.statut}">${esc(c.statut.replace('_', ' '))}</span></td>
           <td><button class="btn sm ghost" data-open-cmd="${c.id}">Ouvrir</button></td></tr>`).join('')}
       </tbody></table></div>` : '<div class="empty">Aucune commande pour l’instant. Partage le lien de la boutique !</div>'}
@@ -187,7 +212,7 @@ async function vueProduits(body) {
       <button class="btn sm ghost" data-filtre="actifs" ${S.produits.etat === 'actifs' ? 'style="border-color:var(--ink)"' : ''}>En ligne</button>
       <button class="btn sm ghost" data-filtre="rupture" ${S.produits.etat === 'rupture' ? 'style="border-color:var(--ink)"' : ''}>Rupture</button>
       <button class="btn sm ghost" data-filtre="inactifs" ${S.produits.etat === 'inactifs' ? 'style="border-color:var(--ink)"' : ''}>Masqués</button>
-      <input id="p-q" class="inp" style="height:34px;width:170px" placeholder="🔍 rechercher…" value="${esc(S.produits.q)}" />
+      <input id="p-q" class="inp" style="height:34px;width:170px" placeholder="rechercher un article…" value="${esc(S.produits.q)}" />
       <button class="btn gold" data-new>➕ Nouvel article</button>
     </div>
   </div>
@@ -703,13 +728,13 @@ async function vueCommandes(body) {
   <div class="row spread" style="flex-wrap:wrap;gap:10px">
     <div><h2 style="margin:0">Commandes</h2><p class="small muted" style="margin:2px 0 0">Clique une ligne pour la détailer : valider le paiement, changer le statut, imprimer le bordereau livreur.</p></div>
     <div class="row" style="flex-wrap:wrap">
-      <input id="c-q" class="inp" style="height:34px;width:190px" placeholder="🔍 réf., nom, téléphone…" value="${esc(S.commandes.q)}" />
+      <input id="c-q" class="inp" style="height:34px;width:190px" placeholder="réf., nom, téléphone…" value="${esc(S.commandes.q)}" />
       <a class="btn sm ghost" href="/api/admin/commandes-export">⬇️ CSV</a>
     </div>
   </div>
   <div class="cats">
     ${['toutes', 'nouvelle', 'payee', 'en_preparation', 'expediee', 'livree', 'annulee'].map((k) =>
-      `<button class="cat ${S.commandes.filtre === k ? 'on' : ''}" data-f="${k}">${k === 'toutes' ? '🗂 Toutes' : LIB_STATUT[k]} <span class="n">${k === 'toutes' ? rows.length : compte(k)}</span></button>`).join('')}
+      `<button class="cat ${S.commandes.filtre === k ? 'on' : ''}" data-f="${k}">${k === 'toutes' ? icone('grille', { taille: 14 }) + ' Toutes' : LIB_STATUT[k]} <span class="n">${k === 'toutes' ? rows.length : compte(k)}</span></button>`).join('')}
   </div>
   ${rows.length ? `<div class="tbl-scroll"><table class="tbl">
     <thead><tr><th>Réf.</th><th>Client</th><th>Mode</th><th>Articles</th><th>Total</th><th>Paiement</th><th>Statut</th><th></th></tr></thead>
@@ -719,7 +744,7 @@ async function vueCommandes(body) {
       <td class="small">${c.mode === 'retrait' ? '🏪 retrait' : '🚚 ' + esc(c.zone_nom || '—')}</td>
       <td class="small">${c.nb_articles} art.</td>
       <td><b>${fcfa(c.total)}</b><br><span class="small muted">dont ${fcfa(c.frais)}</span></td>
-      <td><span class="tag ${c.statut_paiement}">${c.statut_paiement === 'paye' ? '✔ ' + esc(c.prestataire || '') : '⏳ ' + esc(c.paiement)}</span></td>
+      <td><span class="tag ${c.statut_paiement}">${c.statut_paiement === 'paye' ? '✔ ' + esc(c.prestataire || '') : icone('sablier', { taille: 13 }) + ' ' + esc(c.paiement)}</span></td>
       <td><span class="tag ${c.statut}">${LIB_STATUT[c.statut]}</span></td>
       <td><button class="btn sm ghost" data-open="${c.id}">Ouvrir</button></td></tr>`).join('')}
     </tbody></table></div>` : '<div class="bloc empty"><div class="big">📦</div>Aucune commande dans ce filtre.</div>'}`;
@@ -751,7 +776,7 @@ async function ouvrirCommande(id) {
         </div>
       </div>
       <div class="bloc" style="background:#fff"><h4 style="margin:0 0 6px">Paiement</h4>
-        <div class="row spread"><span>${c.paiement === 'orange' ? 'Orange Money' : c.paiement === 'especes' ? 'Espèces' : 'Wave'}</span><span class="tag ${c.statut_paiement}">${c.statut_paiement === 'paye' ? '✔ payé' : '⏳ en attente'}</span></div>
+        <div class="row spread"><span>${c.paiement === 'orange' ? 'Orange Money' : c.paiement === 'especes' ? 'Espèces' : 'Wave'}</span><span class="tag ${c.statut_paiement}">${c.statut_paiement === 'paye' ? '✔ payé' : icone('sablier', { taille: 13 }) + ' en attente'}</span></div>
         <div class="small muted" style="margin-top:4px">Montant attendu : <b>${fcfa(c.total)}</b> → ${esc(c.paiement === 'orange' ? cfg.orange_numero : cfg.wave_numero)}<br>
         Transaction : <span class="mono small">${esc(c.transaction_id || '—')}</span> · Payée le : ${dateFr(c.payee_le)}</div>
         <div class="row" style="margin-top:8px;flex-wrap:wrap">

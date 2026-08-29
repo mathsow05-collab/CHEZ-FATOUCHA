@@ -19,6 +19,10 @@
   <link rel="apple-touch-icon" href="/media/icone-192.png" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="stylesheet" href="/css/style.css" />
+  <!-- les deux polices sont auto-hébergées : on les précharge pour que le titre
+       s'affiche tout de suite dans sa vraie graisse (sinon : reflash visible) -->
+  <link rel="preload" href="/media/polices/fraunces-latin-standard-normal.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/media/polices/manrope-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"ClothingStore","name":"CHEZ FATOUCHA","url":"/","telephone":"77 000 00 00","description":"Boutique de mode en ligne à Dakar : robes, ensembles, sacs, chaussures, parfums. Livraison à Dakar et dans les régions, paiement Wave, Orange Money ou espèces.","address":{"@type":"PostalAddress","addressLocality":"Dakar","addressCountry":"SN"},"openingHours":"Mo-Sa 09:00-19:00","paymentAccepted":"Wave, Orange Money, Espèces","priceRange":"2000 - 50000 XOF"}</script>
 </head>
 <body>
@@ -31,6 +35,8 @@
   </div>
   <div id="toast-root" aria-live="polite"></div>
   <noscript><div class="wrap"><div class="banner warn">Le panier et le paiement ont besoin de JavaScript. Pour commander tout de suite : WhatsApp au 77 000 00 00.</div></div></noscript>
+  <script src="/js/icones.js"></script>
+  <script src="/js/mouvement.js"></script>
   <script src="/js/api.js"></script>
   <script src="/js/app.js"></script>
 </body>

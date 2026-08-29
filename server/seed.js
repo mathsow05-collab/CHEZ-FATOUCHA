@@ -91,7 +91,7 @@ const DEFAULT_SETTINGS = {
      acompte — ça divise à peu près par deux les commandes qui n'aboutissent pas. */
   cod_acompte_a_partir: '25000',
   cod_acompte_montant: '2000',
-  seo_keywords: 'mode, Dakar, livraison, robe, ensemble, sac, parfum, SHEIN, Wave, Orange Money',
+  seo_keywords: 'mode Dakar, robe longue, ensemble two-piece, sac, parfum, bijoux, paiement Wave, Orange Money, livraison Sénégal',
 };
 
 function seed() {

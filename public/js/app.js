@@ -68,11 +68,23 @@ function topbar(active = '') {
         <a href="/faq"${active === 'faq' ? ' aria-current="page"' : ''} class="${active === 'faq' ? 'on' : ''}" data-spa>Aide</a>
       </nav>
       <div class="actions">
-        <button class="icon-btn" data-open-search title="Rechercher un article" aria-label="Rechercher un article">🔍</button>
-        <a class="icon-btn" href="/panier" title="Panier" aria-label="Panier" data-spa>🧺<span class="count" data-cart-count>0</span></a>
+        <button class="icon-btn" data-open-search title="Rechercher un article" aria-label="Rechercher un article">${icone('recherche', { taille: 18 })}<span class="libelle">Chercher</span></button>
+        <a class="icon-btn" href="/panier" title="Panier" aria-label="Panier" data-spa>${icone('panier', { taille: 18 })}<span class="count" data-cart-count>0</span></a>
+        <button class="burger" data-tiroir aria-expanded="false" aria-controls="tiroir" aria-label="Ouvrir le menu">${icone('menu', { taille: 20 })}</button>
       </div>
     </div>
   </header>
+  <nav class="tiroir" id="tiroir" aria-label="Menu">
+    <div class="tete"><b>${esc(Shop.cfg?.nom_boutique || 'CHEZ FATOUCHA')}</b>
+      <button class="close" data-tiroir-x aria-label="Fermer le menu">${icone('croix')}</button></div>
+    <a href="/boutique" data-spa>Boutique${icone('fleche', { taille: 16 })}</a>
+    <a href="/favoris" data-spa>Favoris${icone('coeur', { taille: 16 })}</a>
+    <a href="/suivi" data-spa>Suivre ma commande${icone('colis', { taille: 16 })}</a>
+    <a href="/faq" data-spa>Questions fréquentes${icone('discuter', { taille: 16 })}</a>
+    <a href="/panier" data-spa>Panier${icone('panier', { taille: 16 })}</a>
+    <div class="base"><a class="btn gold block" href="https://wa.me/${esc(String(Shop.cfg?.whatsapp || '').replace(/\D/g, ''))}" target="_blank" rel="noopener">${icone('whatsapp', { taille: 17 })} Écrire à la boutique</a></div>
+  </nav>
+  <div class="tiroir-fond" data-tiroir-fond aria-hidden="true"></div>
   <div class="marquee"><div class="wrap">
     <span>Livraison <b>Dakar dès 1 000 F</b> · régions dès <b>3 000 F</b></span>
     <span>Retrait boutique <b>offert</b></span>
@@ -87,7 +99,7 @@ function footer() {
     <div>
       <h4>${esc(c.nom_boutique || 'Chez Fatoucha')}</h4>
       <div>${esc(c.boutique_description || '')}</div>
-      <div style="margin-top:10px">📍 ${esc(c.adresse_retrait || '')}<br>🕘 ${esc(c.horaires_retrait || '')}</div>
+      <div style="margin-top:10px">${icone('localisation', { taille: 14 })} ${esc(c.adresse_retrait || '')}<br>${icone('sablier', { taille: 14 })} ${esc(c.horaires_retrait || '')}</div>
     </div>
     <div>
       <h4>Aide</h4>
@@ -123,11 +135,11 @@ function card(p, options = {}) {
   const note = p.avis && p.avis.nombre ? `<span class="note-mini">${etoiles(p.avis.moyenne)}<b>${p.avis.moyenne}</b><span class="muted">(${p.avis.nombre})</span></span>` : '';
   const lien = lienProduit(p);
   const photo = img(p);
-  return `<article class="card${compact ? ' compact' : ''}" data-go="${esc(lien)}">
-    <div class="ph">
+  return `<article class="card${compact ? ' compact' : ''}${p.vedette && !compact ? ' ornee' : ''}" data-go="${esc(lien)}"${compact ? '' : ' data-reveal'}>
+    <div class="ph glare squelette">
       <a class="lien-ph" href="${esc(lien)}" data-spa tabindex="-1" aria-hidden="true">${baliseImg(photo, p.titre, { sizes: compact ? '220px' : '(max-width:640px) 46vw, 300px' })}</a>
       <div class="flags">${flags}</div>
-      <button class="cœur ${Favoris.contient(p.id) ? 'on' : ''}" data-fav="${p.id}" aria-label="${Favoris.contient(p.id) ? 'Retirer des favoris' : 'Garder dans mes favoris'}" title="Mes favoris">♥</button>
+      <button class="cœur ${Favoris.contient(p.id) ? 'on' : ''}" data-fav="${p.id}" aria-label="${Favoris.contient(p.id) ? 'Retirer des favoris' : 'Garder dans mes favoris'}" title="Mes favoris">${icone("coeur", { taille: 17 })}</button>
     </div>
     <div class="body">
       <div class="t"><a href="${esc(lien)}" data-spa>${esc(p.titre)}</a></div>
@@ -135,7 +147,7 @@ function card(p, options = {}) {
       ${note}
       <div class="foot">
         <span class="mini">~${p.delai_jours} ${jplural(p.delai_jours)} · Dakar</span>
-        <button class="add-mini" data-add="${p.id}" title="Ajouter au panier" ${p.en_rupture ? 'disabled' : ''}>+</button>
+        <button class="add-mini" data-add="${p.id}" title="Ajouter au panier" aria-label="Ajouter ${esc(p.titre)} au panier" ${p.en_rupture ? 'disabled' : ''}>${icone("plus", { taille: 16 })}</button>
       </div>
     </div>
   </article>`;
@@ -149,7 +161,11 @@ function rangee(titre, sousTitre, produits, options = {}) {
   return `<section class="blk rang${variante ? ' ' + variante : ''}"${ancre ? ` id="${esc(ancre)}"` : ''}><div class="wrap">
     <div class="blk-head">
       <div><h2>${esc(titre)}</h2><p>${esc(sousTitre || '')}</p></div>
-      ${bouton ? `<button class="link" data-vider-rang="${esc(bouton)}">Vider</button>` : '<a class="link" href="/boutique" data-spa>Tout voir →</a>'}
+      ${bouton ? `<button class="link" data-vider-rang="${esc(bouton)}">Vider</button>` : `<a class="link" href="/boutique" data-spa>Tout voir ${icone('fleche', { taille: 15 })}</a>`}
+    </div>
+    <div class="rang-flèches">
+      <button data-rail="gauche" aria-label="Faire défiler à gauche">${icone('fleche_gauche', { taille: 17 })}</button>
+      <button data-rail="droite" aria-label="Faire défiler à droite">${icone('fleche', { taille: 17 })}</button>
     </div>
     <div class="rang-lignes">${produits.map((p) => card(p, { compact: true })).join('')}</div>
   </div></section>`;
@@ -210,7 +226,10 @@ async function chargerBoutique() {
 }
 
 /* ---------------- VUE : boutique ---------------- */
-async function vueBoutique() {
+/* Une seule vue, deux visages : la page d'accueil (avec son héro éditorial et ses
+   rails) et le catalogue (/boutique), qui doit rester ce que le serveur a déjà
+   affiché — sinon la page « saute » d'un contenu à l'autre à l'hydratation. */
+async function vueBoutique({ accueil = true } = {}) {
   const { cats, produits, vedettes, parPage } = await chargerBoutique();
   state.produits = produits;
   const dispo = produits.filter((p) => !p.en_rupture).length;
@@ -220,15 +239,14 @@ async function vueBoutique() {
   const filtresActifs = !!(state.q || state.filtreCat || state.taille || state.prixMin || state.prixMax || state.dispo || state.tri !== 'recent');
   const vus = Vu.lus().filter((x) => !produits.some((p) => p.id === x.id)).slice(0, 6);
   const favs = Favoris.liste().slice(0, 6);
-  return `
-  ${topbar('boutique')}
-  <section class="hero"><div class="wrap"><div class="inner">
+  const tete = accueil ? `
+  <section class="hero"><div class="wrap"><div class="inner spot">
     <div class="txt">
-    <span class="sur">Sélection &amp; pièces choisies · Dakar</span>
+    <span class="sur shiny">Sélection &amp; pièces choisies · Dakar</span>
     <h1>La mode qui t’aime, <em>livrée à ta porte</em>.</h1>
     <p>Robes, ensembles, sacs, chaussures, parfums… choisis ta taille et ta quantité, paie par Wave ou Orange Money. On livre à Dakar et dans toutes les régions — ou tu viens retirer à la boutique.</p>
     <div class="cta">
-      <a class="btn gold big" href="#boutique-grid" data-ancre>Voir les ${total} articles</a>
+      <a class="btn gold big" href="#boutique-grid" data-ancre data-aimant="8">Voir les ${total} articles</a>
       <a class="btn ghost big" href="/suivi" data-spa>Suivre ma commande</a>
     </div>
     <div class="stats">
@@ -238,17 +256,25 @@ async function vueBoutique() {
       <div><b>Wave / OM</b> paiement direct</div>
     </div>
     </div>
-    <figure class="visuel">
+    <figure class="visuel ornee">
       <img src="${urlImg('/media/demo/lookbook.jpg', 900)}" srcset="${srcsetImg('/media/demo/lookbook.jpg', [480, 900, 1200])}" sizes="(max-width:900px) 92vw, 460px" width="900" height="1200" fetchpriority="high" decoding="async" alt="Silhouette de la sélection Chez Fatoucha"
            onerror="this.closest('.visuel').style.display='none'" />
-      <figcaption>La sélection Fatoucha</figcaption>
+      <figcaption class="shiny">La sélection Fatoucha</figcaption>
     </figure>
-  </div></div></section>
+  </div></div></section>` : `
+  <section class="page-tete"><div class="wrap">
+    <span class="sur">Catalogue</span>
+    <h1>${state.q ? `Résultats pour « ${esc(state.q)} »` : state.filtreCat ? (cats.find((c) => String(c.id) === String(state.filtreCat))?.name || 'Catégorie') : 'Tous les articles'}</h1>
+    <p>${produits.length} article(s)${dispo !== produits.length ? ` · ${dispo} en stock` : ''} · prix en FCFA, livraison calculée au panier</p>
+  </div></section>`;
 
+  return `
+  ${topbar('boutique')}
+  ${tete}
   <section class="blk"><div class="wrap">
     <div class="cats" id="cats">
       <button class="cat ${!state.filtreCat ? 'on' : ''}" data-cat="" aria-pressed="${!state.filtreCat}">Tout</button>
-      ${cats.map((c) => `<button class="cat ${String(state.filtreCat) === String(c.id) ? 'on' : ''}" data-cat="${c.id}" aria-pressed="${String(state.filtreCat) === String(c.id)}">${c.emoji} ${esc(c.name)} <span class="n">${c.n}</span></button>`).join('')}
+      ${cats.map((c) => `<button class="cat ${String(state.filtreCat) === String(c.id) ? 'on' : ''}" data-cat="${c.id}" aria-pressed="${String(state.filtreCat) === String(c.id)}">${puceCategorie(c.emoji)}${esc(c.name)} <span class="n">${c.n}</span></button>`).join('')}
     </div>
   </div></section>
 
@@ -270,14 +296,14 @@ async function vueBoutique() {
     </div>
   </div></section>` : ''}
 
-  ${vedettes.length && !filtresActifs ? rangee('Sélection de Fatou', 'Les pièces qu’elle met en avant cette semaine.', vedettes, { variante: 'selection' }) : ''}
-  ${favs.length ? rangee('Tes favoris', 'Gardés sur cet appareil — touche le cœur sur une fiche pour les retirer.', favs.map((f) => ({ ...f, avis: null })), { variante: 'favoris', bouton: 'favoris' }) : ''}
+  ${accueil && vedettes.length && !filtresActifs ? rangee('Sélection de Fatou', 'Les pièces qu’elle met en avant cette semaine.', vedettes, { variante: 'selection' }) : ''}
+  ${accueil && favs.length ? rangee('Tes favoris', 'Gardés sur cet appareil — touche le cœur sur une fiche pour les retirer.', favs.map((f) => ({ ...f, avis: null })), { variante: 'favoris', bouton: 'favoris' }) : ''}
 
   <section class="blk" id="boutique-grid"><div class="wrap">
     <div class="blk-head">
       <div>
-        <h2>${state.q ? `Résultats pour « ${esc(state.q)} »` : state.filtreCat ? cats.find((c) => String(c.id) === String(state.filtreCat))?.name || 'Catégorie' : 'Nouveautés & bons plans'}</h2>
-        <p>${produits.length} article(s)${state.page > 1 ? ` · page ${state.page}` : ''} · prix en FCFA, livraison calculée au panier</p>
+        <h2>${accueil ? (state.q ? `Résultats pour « ${esc(state.q)} »` : state.filtreCat ? cats.find((c) => String(c.id) === String(state.filtreCat))?.name || 'Catégorie' : 'Nouveautés & bons plans') : 'Toutes les pièces'}</h2>
+        ${accueil ? `<p>${produits.length} article(s)${state.page > 1 ? ` · page ${state.page}` : ''} · prix en FCFA, livraison calculée au panier</p>` : `<p>${produits.length} pièce(s) en ligne${state.page > 1 ? ` · page ${state.page}` : ''}</p>`}
       </div>
       <div class="row">
         <select class="inp" id="tri" style="height:38px;padding:0 10px;width:auto" aria-label="Trier les articles">
@@ -287,11 +313,11 @@ async function vueBoutique() {
       </div>
     </div>
     ${produits.length ? `<div class="grid">${produits.map((p) => card(p)).join('')}</div>`
-      : `<div class="empty"><div class="big">🧺</div>Aucun article ne correspond.<br><button class="link" data-clear>Enlever les filtres</button></div>`}
+      : `<div class="empty"><div class="big">${icone("recherche", { taille: 34 })}</div>Aucun article ne correspond.<br><button class="link" data-clear>Enlever les filtres</button></div>`}
     ${peutPlus ? `<div class="rang-pied"><button class="btn ghost" data-plus>Voir ${Math.min(24, total - produits.length)} articles de plus →</button></div>` : ''}
   </div></section>
 
-  ${vus.length ? rangee('Vu récemment', 'Reprendre là où tu t’es arrêtée.', vus, { variante: 'vus', bouton: 'vus' }) : ''}
+  ${accueil && vus.length ? rangee('Vu récemment', 'Reprendre là où tu t’es arrêtée.', vus, { variante: 'vus', bouton: 'vus' }) : ''}
   ${footer()}`;
 }
 
@@ -307,7 +333,7 @@ async function vueFavoris() {
     <p class="small muted">${favs.length} article(s) gardés sur cet appareil. Rien n’est envoyé à la boutique tant que tu ne commandes pas.</p>
     ${vivants.length ? `<div class="grid">${vivants.map((p) => card(p)).join('')}</div>
       <div class="row" style="margin-top:16px"><button class="btn ghost sm" data-vider-rang="favoris">Vider mes favoris</button></div>`
-      : `<div class="empty bloc"><div class="big">♥</div><h3>Aucun favori pour l’instant</h3>
+      : `<div class="empty bloc"><div class="big">${icone("coeur", { taille: 34 })}</div><h3>Aucun favori pour l’instant</h3>
          <p>Sur une fiche, touche le cœur : l’article restera ici, le temps de réfléchir.</p>
          <a class="btn gold big" href="/boutique" data-spa>Voir la boutique</a></div>`}
   </div>${footer()}`;
@@ -326,7 +352,7 @@ async function vueContenu(slug) {
     ${slug === 'faq' ? `<div class="acc">${markdown(page.corps)}</div>` : markdown(page.corps)}
     <div class="row" style="margin-top:22px;flex-wrap:wrap">
       <a class="btn ghost" href="/boutique" data-spa>Voir la boutique</a>
-      <a class="btn gold" href="https://wa.me/${esc((Shop.cfg?.whatsapp || '').replace(/\D/g, ''))}" target="_blank" rel="noopener">💬 Demander à la boutique</a>
+      <a class="btn gold" href="https://wa.me/${esc((Shop.cfg?.whatsapp || '').replace(/\D/g, ''))}" target="_blank" rel="noopener">${icone("whatsapp", { taille: 16 })} Demander à la boutique</a>
     </div>
   </div></section>
   ${footer()}`;
@@ -374,16 +400,16 @@ async function vueProduit(cle) {
           <div class="small muted">Vidéo de l’article réel, envoyée par la boutique.</div></div>` : ''}
         ${video && !videoInterne ? `<a class="btn ghost block" href="${esc(video)}" target="_blank" rel="noopener">▶ Voir la vidéo du produit</a>` : ''}
         <div class="gal-actions">
-          <button class="link" data-partage>🔗 Partager</button>
-          <button class="link ${Favoris.contient(p.id) ? 'on' : ''}" data-fav="${p.id}">♥ ${Favoris.contient(p.id) ? 'Dans tes favoris' : 'Garder'}</button>
-          <a class="link" href="https://wa.me/${esc((Shop.cfg?.whatsapp || '').replace(/\D/g, ''))}?text=${encodeURIComponent(`Salam ! Je suis intéressée par « ${p.titre} » (${money(p.prix)}) — ${location.origin}/produit/${p.slug || p.id}`)}" target="_blank" rel="noopener" data-mesure="clic_whatsapp">💬 Demander une photo réelle</a>
+          <button class="link" data-partage>${icone("partager", { taille: 15 })} Partager</button>
+          <button class="link ${Favoris.contient(p.id) ? 'on' : ''}" data-fav="${p.id}">${icone("coeur", { taille: 15 })} ${Favoris.contient(p.id) ? 'Dans tes favoris' : 'Garder'}</button>
+          <a class="link" href="https://wa.me/${esc((Shop.cfg?.whatsapp || '').replace(/\D/g, ''))}?text=${encodeURIComponent(`Salam ! Je suis intéressée par « ${p.titre} » (${money(p.prix)}) — ${location.origin}/produit/${p.slug || p.id}`)}" target="_blank" rel="noopener" data-mesure="clic_whatsapp">${icone('whatsapp', { taille: 16 })} Demander une photo réelle</a>
         </div>
       </div>
 
       <div class="stack">
         <div>
           <div class="row" style="gap:6px;margin-bottom:6px">
-            ${p.marque ? `<span class="pill">${esc(p.marque)}</span>` : ''}
+            ${p.en_rupture ? '' : `<span class="pill">${monogramme()} sélection</span>`}
             ${promo ? `<span class="pill red">-${promo}%</span>` : ''}
             ${p.en_rupture ? '<span class="pill red">Rupture de stock</span>' : `<span class="pill teal">${p.stock <= 3 ? `Plus que ${p.stock} en stock` : 'Disponible'}</span>`}
           </div>
@@ -397,12 +423,12 @@ async function vueProduit(cle) {
           </div>
         </div>
 
-        ${p.mannequin ? `<div class="puce-mannequin">📏 ${esc(p.mannequin)}</div>` : ''}
+        ${p.mannequin ? `<div class="puce-mannequin">${icone("regle", { taille: 15 })} ${esc(p.mannequin)}</div>` : ''}
 
         ${p.tailles.length ? `<div class="opt"><span class="lbl">Taille</span><div class="chips" id="pd-tailles">
           ${p.tailles.map((t) => `<button class="chip ${state.vue.taille === t ? 'on' : ''}" data-taille="${esc(t)}" ${stockPour(p, t, state.vue.coloris) === 0 ? 'disabled' : ''}>${esc(t)}</button>`).join('')}
         </div>
-        <div class="opt-aide">${guide ? `<button class="link" data-guide>📐 Guide des tailles (cm)</button>` : ''}${guide ? `<button class="link" data-trouve>✦ Trouver ma taille</button>` : ''}</div>
+        <div class="opt-aide">${guide ? `<button class="link" data-guide>${icone("regle", { taille: 15 })} Guide des tailles (cm)</button>` : ''}${guide ? `<button class="link" data-trouve>✦ Trouver ma taille</button>` : ''}</div>
         </div>` : ''}
         ${p.coloris.length ? `<div class="opt"><span class="lbl">Coloris</span><div class="chips" id="pd-coloris">
           ${p.coloris.map((c) => `<button class="chip swatch ${state.vue.coloris === c ? 'on' : ''}" data-coloris="${esc(c)}"><span class="dot" style="background:${esc(teinte(c))}"></span>${esc(c)}</button>`).join('')}
@@ -437,10 +463,10 @@ async function vueProduit(cle) {
           <p class="small muted">Mesures du vêtement à plat, tour = ×2. Entre deux tailles : prends la plus grande, on échange sous 48 h.</p></details>` : ''}
 
         <div class="info-lines">
-          <div class="li"><i>🚚</i><div><b>Livraison</b> — article commandé au fournisseur sous ~${p.delai_jours} ${jplural(p.delai_jours)}, puis on te l’apporte : Dakar 24-36 h, régions 2-4 j.</div></div>
-          <div class="li"><i>🏪</i><div><b>Retrait gratuit</b> — ${esc(Shop.cfg?.adresse_retrait || '')} · ${esc(Shop.cfg?.horaires_retrait || '')}</div></div>
-          <div class="li"><i>📱</i><div><b>Paiement</b> — Wave ou Orange Money (direct depuis le site), ou espèces à la livraison.</div></div>
-          <div class="li"><i>🔁</i><div><b>Échange</b> — taille non conforme ? <a class="link" href="/retours" data-spa>Notre politique</a> : 48 h pour nous écrire.</div></div>
+          <div class="li"><i>${icone('camion')}</i><div><b>Livraison</b> — article commandé au fournisseur sous ~${p.delai_jours} ${jplural(p.delai_jours)}, puis on te l’apporte : Dakar 24-36 h, régions 2-4 j.</div></div>
+          <div class="li"><i>${icone('boutique')}</i><div><b>Retrait gratuit</b> — ${esc(Shop.cfg?.adresse_retrait || '')} · ${esc(Shop.cfg?.horaires_retrait || '')}</div></div>
+          <div class="li"><i>${icone('carte')}</i><div><b>Paiement</b> — Wave ou Orange Money (direct depuis le site), ou espèces à la livraison.</div></div>
+          <div class="li"><i>${icone('echange')}</i><div><b>Échange</b> — taille non conforme ? <a class="link" href="/retours" data-spa>Notre politique</a> : 48 h pour nous écrire.</div></div>
         </div>
       </div>
     </div>
@@ -453,10 +479,10 @@ async function vueProduit(cle) {
     <div class="blk-head">
       <div><h2>${nb ? `${nb} avis d’acheteuses` : 'Avis des acheteuses'}</h2>
         <p>${nb ? `Note moyenne ${note}/5 · seuls les articles reçus peuvent être notés.` : 'Personne n’a encore noté cet article.'}</p></div>
-      <button class="btn sm" data-avis>✍️ Laisser un avis</button>
+      <button class="btn sm" data-avis>${icone("crayon", { taille: 15 })} Laisser un avis</button>
     </div>
     ${nb ? `<div class="avis-resume"><div class="grosse-note"><b>${note}</b><span>/5</span></div>
-      <div class="barres">${[5, 4, 3, 2, 1].map((n) => { const c = (p.avis_liste || []).filter((a) => a.note === n).length; return `<div class="bar"><span>${n}★</span><i><b style="width:${nb ? Math.round((c / nb) * 100) : 0}%"></b></i><em>${c}</em></div>`; }).join('')}</div></div>` : ''}
+      <div class="histo">${[5, 4, 3, 2, 1].map((n) => { const c = (p.avis_liste || []).filter((a) => a.note === n).length; return `<div><span>${n}★</span><i><b style="width:${nb ? Math.round((c / nb) * 100) : 0}%"></b></i><em>${c}</em></div>`; }).join('')}</div></div>` : ''}
     ${(p.avis_liste || []).length ? `<div class="avis-liste">${p.avis_liste.map(avisItem).join('')}</div>` : '<div class="small muted">Les avis publiés apparaîtront ici.</div>'}
     ${avisAvecPhotos(p).length ? `<div class="photos-avis">${avisAvecPhotos(p).map((a) => `<figure class="photo-avis">${baliseImg(a.photo, `Photo envoyée par ${a.prenom}`, { largeurs: [220, 480], sizes: '150px' })}<figcaption>${esc(a.prenom)}</figcaption></figure>`).join('')}</div>` : ''}
   </div></section>
@@ -495,7 +521,7 @@ async function vuePanier() {
   if (!items.length) {
     return `${topbar('boutique')}
       <div class="wrap" style="padding:40px 16px 60px">
-        <div class="empty bloc"><div class="big">🧺</div><h3>Ton panier est vide</h3>
+        <div class="empty bloc"><div class="big">${icone("panier", { taille: 34 })}</div><h3>Ton panier est vide</h3>
         <p>Ajoute un article et choisis ta taille — on calcule la livraison tout de suite après.</p>
         <div class="row" style="justify-content:center;flex-wrap:wrap;gap:8px">
           <a class="btn gold big" href="/boutique" data-spa>Voir la boutique</a>
@@ -571,7 +597,7 @@ async function vueCommande() {
   return `
   ${topbar('boutique')}
   <div class="wrap" style="padding:20px 16px 60px">
-    <h1 style="font-size:24px">🧾 Finaliser la commande</h1>
+    <h1 style="font-size:24px">Finaliser la commande</h1>
     <div class="pd">
       <div class="stack">
         <div class="bloc stack">
@@ -585,8 +611,8 @@ async function vueCommande() {
         <div class="bloc stack">
           <h3>2 · Comment tu récupères ?</h3>
           <div class="seg" id="seg-mode">
-            <button data-mode="livraison" class="on">🚚 Livraison</button>
-            <button data-mode="retrait">🏪 Retrait boutique</button>
+            <button data-mode="livraison" class="on">${icone("camion", { taille: 17 })} Livraison</button>
+            <button data-mode="retrait">${icone("boutique", { taille: 17 })} Retrait boutique</button>
           </div>
           <div id="zone-box">
             <div class="opt"><span class="lbl">Zone de livraison</span>
@@ -606,7 +632,7 @@ async function vueCommande() {
             <div class="field" style="margin-top:12px"><label for="f-adresse">Adresse / repère</label>
               <textarea id="f-adresse" class="inp" placeholder="Ex. Pikine Sicage, en face de la pharmacie, villa bleue, dernier portail"></textarea></div>
           </div>
-          <div id="retrait-box" class="hidden banner ok">🏪 <div><b>Retrait gratuit</b> — ${esc(cfg.adresse_retrait || '')}<br><span class="small">${esc(cfg.horaires_retrait || '')}. On t’appelle dès que l’article est prêt.</span></div></div>
+          <div id="retrait-box" class="hidden banner ok">${icone("boutique", { taille: 16 })} <div><b>Retrait gratuit</b> — ${esc(cfg.adresse_retrait || '')}<br><span class="small">${esc(cfg.horaires_retrait || '')}. On t’appelle dès que l’article est prêt.</span></div></div>
           <div class="field"><label for="f-instr">Précisions (optionnel)</label>
             <input id="f-instr" class="inp" placeholder="Ex. livrer après 17h, demander Aminata, code porte 12A…" /></div>
           <div id="eta-box" class="banner"></div>
@@ -618,7 +644,7 @@ async function vueCommande() {
             ${cfg.paiement_methodes.map((m) => `
               <label class="pm-card ${m.id === 'wave' ? 'on' : ''}" data-pm="${m.id}">
                 <input type="radio" name="pm" value="${m.id}" ${m.id === 'wave' ? 'checked' : ''} class="hidden" />
-                <span class="badge" style="background:${m.couleur}">${m.id === 'wave' ? 'W' : m.id === 'orange' ? 'OM' : '💵'}</span>
+                <span class="badge" style="background:${m.couleur}">${m.id === 'wave' ? 'W' : m.id === 'orange' ? 'OM' : 'ESP'}</span>
                 <span class="grow">
                   <b>${esc(m.libelle)}</b>
                   <div class="small muted">${m.id === 'wave' ? 'Envoi direct dans l’app Wave, on valide à la réception.' : m.id === 'orange' ? 'Push Orange Money sur ton téléphone, code PIN.' : 'Tu règles au livreur ou au retrait.'}</div>
@@ -627,8 +653,8 @@ async function vueCommande() {
               </label>`).join('')}
           </div>
           ${cfg.paiement_mode === 'cinetpay'
-            ? '<div class="banner ok">🔒 Paiement automatique activé : dès que tu paies, la commande passe en préparation sans attendre.</div>'
-            : '<div class="banner warn">ℹ️ Tu envoies l’argent au numéro de la boutique, la commande est validée dès confirmation (souvent en moins de 10 min).</div>'}
+            ? `<div class="banner ok">${icone('cadenas', { taille: 16 })} Paiement automatique activé : dès que tu paies, la commande passe en préparation sans attendre.</div>`
+            : `<div class="banner warn">${icone('alerte', { taille: 16 })} Tu envoies l’argent au numéro de la boutique, la commande est validée dès confirmation (souvent en moins de 10 min).</div>`}
           <div id="co-acompte"></div>
           <div class="banner confiance-note">✔ Une fois la commande créée, on te donne un <b>lien de confirmation</b> à ouvrir sur WhatsApp. Tu appuies, et le livreur ne part que si tu es prête.</div>
         </div>
@@ -669,7 +695,7 @@ function majFrais() {
   const frais = c.mode === 'livraison' ? Shop.frais(c.zone_id, sous) : 0;
   const total = sous + frais;
   const gratuit = c.mode === 'livraison' && frais === 0 && sous > 0;
-  document.getElementById('co-ship').textContent = c.mode === 'retrait' ? 'Gratuit (retrait)' : gratuit ? 'Gratuite 🎉' : money(frais);
+  document.getElementById('co-ship').textContent = c.mode === 'retrait' ? 'Gratuit (retrait)' : gratuit ? 'Gratuite' : money(frais);
   document.getElementById('sum-ship') && (document.getElementById('sum-ship').textContent = 'à calculer');
   document.getElementById('co-total').textContent = money(total);
   document.getElementById('mob-total').textContent = money(total);
@@ -681,11 +707,11 @@ function majFrais() {
     if (c.mode === 'retrait' || !zone) {
       eta.className = 'banner';
       eta.innerHTML = c.mode === 'retrait'
-        ? `⏱️ Retrait prévu ~<b>${delaiMax} ${jplural(delaiMax)}</b> après le paiement (le temps de recevoir l’article du fournisseur).`
-        : '⏱️ Choisis ta zone pour estimer la date de réception.';
+        ? `<span class="ico-led">${icone('sablier', { taille: 15 })}</span> Retrait prévu ~<b>${delaiMax} ${jplural(delaiMax)}</b> après le paiement (le temps de recevoir l’article du fournisseur).`
+        : `<span class="ico-led">${icone('sablier', { taille: 15 })}</span> Choisis ta zone pour estimer la date de réception.`;
     } else {
       eta.className = 'banner ok';
-      eta.innerHTML = `⏱️ Estimation : approvisionnement ~<b>${delaiMax} ${jplural(delaiMax)}</b> + livraison <b>${heures(zone.delai_heures)}</b> → reçu dans ~<b>${delaiMax + Math.ceil(zone.delai_heures / 24)} jours</b>.`;
+      eta.innerHTML = `${icone('sablier', { taille: 15 })} Estimation : approvisionnement ~<b>${delaiMax} ${jplural(delaiMax)}</b> + livraison <b>${heures(zone.delai_heures)}</b> → reçu dans ~<b>${delaiMax + Math.ceil(zone.delai_heures / 24)} jours</b>.`;
     }
   }
   /* Acompte sur les commandes en espèces : la pratique qui fait le plus chuter
@@ -696,7 +722,7 @@ function majFrais() {
     const montant = Number(Shop.cfg?.cod_acompte_montant || 0);
     const du = c.paiement === 'especes' && montant > 0 && (!seuil || total >= seuil);
     boite.innerHTML = du
-      ? `<div class="banner warn">💵 <b>Acompte de ${money(montant)}</b> à envoyer tout de suite par Wave, le reste — <b>${money(Math.max(0, total - montant))}</b> — au livreur. Le commentaire du transfert : ta référence de commande.</div>`
+      ? `<div class="banner warn">${icone("billets", { taille: 16 })} <b>Acompte de ${money(montant)}</b> à envoyer tout de suite par Wave, le reste — <b>${money(Math.max(0, total - montant))}</b> — au livreur. Le commentaire du transfert : ta référence de commande.</div>`
       : '';
   }
   const btn = document.getElementById('btn-commande');
@@ -770,13 +796,13 @@ async function vuePaiement(ref) {
       <h3>Payer avec ${cmd.paiement === 'orange' ? 'Orange Money' : cmd.paiement === 'especes' ? 'espèces' : 'Wave'}</h3>
       <div id="pay-actions" class="stack">
         ${cfg.paiement_mode === 'cinetpay'
-          ? `<button class="btn big block ${cmd.paiement === 'orange' ? 'orange' : 'wave'}" data-pay>💳 Payer ${money(cmd.total)} maintenant</button>
+          ? `<button class="btn big block ${cmd.paiement === 'orange' ? 'orange' : 'wave'}" data-pay>${icone("carte", { taille: 17 })} Payer ${money(cmd.total)} maintenant</button>
              <p class="small muted" style="margin:0">Tu seras renvoyé·e vers la page de paiement sécurisée : choisis <b>Wave</b> ou <b>Orange Money</b>, saisis ton numéro, puis ton code secret pour valider. La commande passe en préparation toute seule.</p>`
           : cmd.paiement === 'especes'
-            ? '<div class="banner ok">💵 Tu paies <b>à la livraison</b>. Tiens le montant prêt : le livreur ne rend pas toujours la monnaie.</div>'
-            : `<div class="banner warn">ℹ️ Envoie d’abord l’argent au numéro de la boutique, puis appuie sur « J’ai payé » : Fatou valide dès réception.</div>`}
+            ? `<div class="banner ok">${icone('billets', { taille: 16 })} Tu paies <b>à la livraison</b>. Tiens le montant prêt : le livreur ne rend pas toujours la monnaie.</div>`
+            : `<div class="banner warn">${icone("alerte", { taille: 16 })} Envoie d’abord l’argent au numéro de la boutique, puis appuie sur « J’ai payé » : Fatou valide dès réception.</div>`}
       </div>
-      ${cmd.paiement === 'especes' && (cmd.acompte || 0) > 0 ? `<div class="banner warn" style="margin-top:14px">💵 <b>Acompte de ${money(cmd.acompte)}</b> à envoyer maintenant par Wave (numéro ${esc(cfg.wave_numero || 'à configurer')}), puis <b>${money(cmd.reste_a_payer || cmd.total)}</b> au livreur.</div>` : ''}
+      ${cmd.paiement === 'especes' && (cmd.acompte || 0) > 0 ? `<div class="banner warn" style="margin-top:14px">${icone("billets", { taille: 16 })} <b>Acompte de ${money(cmd.acompte)}</b> à envoyer maintenant par Wave (numéro ${esc(cfg.wave_numero || 'à configurer')}), puis <b>${money(cmd.reste_a_payer || cmd.total)}</b> au livreur.</div>` : ''}
       ${cmd.client_confirme_le
         ? `<div class="banner ok" style="margin-top:14px">✔ Commande confirmée par toi le ${dateFr(cmd.client_confirme_le)} — on t’appelle avant que le livreur parte.</div>`
         : `<div class="bloc bloc-confirme" style="margin-top:14px">
@@ -785,7 +811,7 @@ async function vuePaiement(ref) {
              <div class="row" style="flex-wrap:wrap;gap:8px">
                <button class="btn gold" data-confirme>✔ Oui, je confirme</button>
                ${cmd.page_confirmation ? `<a class="btn ghost" href="${esc(cmd.page_confirmation)}">Ouvrir mon lien de confirmation</a>` : ''}
-               <a class="btn ghost" target="_blank" rel="noopener" href="https://wa.me/${esc((cfg.whatsapp || '').replace(/\D/g, ''))}?text=${encodeURIComponent('Je confirme ma commande ' + cmd.reference + (cmd.code_confirmation ? ' — code ' + cmd.code_confirmation : '') + '.')}">💬 Confirmer par WhatsApp</a>
+               <a class="btn ghost" target="_blank" rel="noopener" href="https://wa.me/${esc((cfg.whatsapp || '').replace(/\D/g, ''))}?text=${encodeURIComponent('Je confirme ma commande ' + cmd.reference + (cmd.code_confirmation ? ' — code ' + cmd.code_confirmation : '') + '.')}">${icone('whatsapp', { taille: 16 })} Confirmer par WhatsApp</a>
              </div>
              ${cmd.code_confirmation ? `<div class="code-conf"><span class="et">${cmd.paiement === 'especes' ? (cmd.mode === 'retrait' ? 'Code à donner en boutique' : 'Code à donner au livreur') : 'Code de confirmation'}</span><b>${esc(cmd.code_confirmation)}</b></div>` : ''}
              ${(cmd.acompte || 0) > 0 ? `<div class="small muted" style="margin-top:8px">Acompte déjà demandé : <b>${money(cmd.acompte)}</b> · reste <b>${money(cmd.reste_a_payer || cmd.total)}</b> ${cmd.mode === 'retrait' ? 'au retrait' : 'au livreur'}.</div>` : ''}
@@ -794,7 +820,7 @@ async function vuePaiement(ref) {
       <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:4px">
         <button class="btn ghost sm" data-switch="wave" ${cmd.paiement === 'wave' ? 'disabled' : ''}>Basculer sur Wave</button>
         <button class="btn ghost sm" data-switch="orange" ${cmd.paiement === 'orange' ? 'disabled' : ''}>Basculer sur Orange Money</button>
-        <a class="btn ghost sm" href="https://wa.me/${esc((cfg.whatsapp || '').replace(/\D/g, ''))}?text=${encodeURIComponent('Salam! Je viens de commander ' + cmd.reference + ' (' + cmd.total + ' F) sur le site.')}" target="_blank" rel="noopener">💬 Écrire à la boutique</a>
+        <a class="btn ghost sm" href="https://wa.me/${esc((cfg.whatsapp || '').replace(/\D/g, ''))}?text=${encodeURIComponent('Salam! Je viens de commander ' + cmd.reference + ' (' + cmd.total + ' F) sur le site.')}" target="_blank" rel="noopener">${icone('whatsapp', { taille: 16 })} Écrire à la boutique</a>
       </div>
       <hr style="border:0;border-top:1px dashed var(--line);margin:6px 0" />
       <div class="steps">
@@ -804,7 +830,7 @@ async function vuePaiement(ref) {
         <div><b>4.</b> Livraison estimée : ${cmd.delai_estime_jours} ${jplural(cmd.delai_estime_jours)} après validation.</div>
       </div>
       <div class="row" style="flex-wrap:wrap">
-        <a class="btn ghost sm" href="/commande/${esc(cmd.reference)}" data-spa>📦 Voir le suivi</a>
+        <a class="btn ghost sm" href="/commande/${esc(cmd.reference)}" data-spa>${icone("colis", { taille: 16 })} Voir le suivi</a>
         <button class="btn danger sm" data-cancel>Annuler la commande</button>
       </div>
     </div>
@@ -816,12 +842,12 @@ function vuePaiementPaye(cmd, cfg) {
   ${topbar('boutique')}
   <div class="wrap" style="padding:26px 16px 60px;max-width:640px">
     <div class="bloc center stack" style="padding:28px">
-      <div style="font-size:52px">🎉</div>
+      <div class="sceau">${icone("check", { taille: 30 })}</div>
       <h2 style="margin:0">Paiement reçu — commande confirmée</h2>
       <p class="muted">Référence <b class="mono">${esc(cmd.reference)}</b> · ${money(cmd.total)}</p>
-      <div class="banner ${cmd.statut === 'livree' ? 'ok' : ''}" style="text-align:left">⏱️ Livraison estimée dans ~<b>${cmd.delai_estime_jours} ${jplural(cmd.delai_estime_jours)}</b>${cmd.mode === 'retrait' ? ' — retrait : ' + esc(cfg.adresse_retrait || '') : ' — ' + esc(cmd.zone || '')}</div>
+      <div class="banner ${cmd.statut === 'livree' ? 'ok' : ''}" style="text-align:left">${icone('sablier', { taille: 16 })} Livraison estimée dans ~<b>${cmd.delai_estime_jours} ${jplural(cmd.delai_estime_jours)}</b>${cmd.mode === 'retrait' ? ' — retrait : ' + esc(cfg.adresse_retrait || '') : ' — ' + esc(cmd.zone || '')}</div>
       <div class="row" style="justify-content:center">
-        <a class="btn gold big" href="/commande/${esc(cmd.reference)}" data-spa>📦 Suivre ma commande</a>
+        <a class="btn gold big" href="/commande/${esc(cmd.reference)}" data-spa>${icone("colis", { taille: 17 })} Suivre ma commande</a>
         <a class="btn ghost big" href="/" data-spa>Retour boutique</a>
       </div>
     </div>
@@ -834,7 +860,7 @@ const STATUTS_SUIVI = [
   ['payee', 'Paiement validé', 'Fatou prépare ton colis'],
   ['en_preparation', 'En préparation', 'Article reçu du fournisseur / vérifié'],
   ['expediee', 'Expédiée', 'Le livreur est en route'],
-  ['livree', 'Livrée', 'Profité ! Partage une photo sur WhatsApp 😍'],
+  ['livree', 'Livrée', 'Profité ! Partage une photo sur WhatsApp'],
 ];
 
 async function vueSuivi(ref = '', tel = '') {
@@ -843,7 +869,7 @@ async function vueSuivi(ref = '', tel = '') {
     return `${topbar('boutique')}
     <div class="wrap" style="padding:26px 16px 60px;max-width:520px">
       <div class="bloc stack">
-        <h2 style="font-size:20px">📦 Suivre une commande</h2>
+        <h1 class="h-bloc">Suivre une commande</h1>
         <p class="small muted">Entre la référence reçue après ta commande (ex. <span class="mono">CMD-4K7Q-2M8P</span>) et ton numéro.</p>
         <div class="field"><label for="s-ref">Référence</label><input id="s-ref" class="inp mono" placeholder="CMD-XXXX-XXXX" value="${esc(localStorage.getItem('fatoucha_last_ref') || '')}" /></div>
         <div class="field"><label for="s-tel">Ton numéro</label><input id="s-tel" class="inp" placeholder="77 123 45 67" inputmode="tel" value="${esc(localStorage.getItem('fatoucha_last_tel') || '')}" /></div>
@@ -867,7 +893,7 @@ async function vueSuivi(ref = '', tel = '') {
     <div class="bloc stack" style="margin-top:14px">
       ${cmd.statut === 'annulee' ? '<div class="banner ko">Cette commande a été annulée (paiement non reçu dans les temps ou demande client).</div>' : ''}
       ${cmd.statut_paiement !== 'paye' && cmd.statut !== 'annulee'
-        ? `<div class="banner warn">💳 Paiement de <b>${money(cmd.total)}</b> en attente. <a class="link" href="/paiement/${esc(cmd.reference)}" data-spa>Payer maintenant →</a></div>` : ''}
+        ? `<div class="banner warn">${icone('carte', { taille: 16 })} Paiement de <b>${money(cmd.total)}</b> en attente. <a class="link" href="/paiement/${esc(cmd.reference)}" data-spa>Payer maintenant →</a></div>` : ''}
       <div class="tl">
         ${STATUTS_SUIVI.map((s, i) => `
           <div class="st ${i < idx ? 'done' : i === idx ? 'now' : ''}">
@@ -887,7 +913,7 @@ async function vueSuivi(ref = '', tel = '') {
       </div>
       ${!cmd.client_confirme_le && cmd.statut !== 'annulee' && cmd.statut !== 'livree'
         ? `<div class="banner ${cmd.paiement === 'especes' ? 'warn' : ''}">${cmd.paiement === 'especes'
-            ? '⏳ La boutique attend ton feu vert avant d’envoyer le livreur.'
+            ? `<span class="ico-led">${icone('alerte', { taille: 15 })}</span> La boutique attend ton feu vert avant d’envoyer le livreur.`
             : 'Un mot pour dire que tu seras bien là, et la boutique prépare ton colis sereinement.'}
            <button class="link" data-confirme-ref="${esc(cmd.reference)}">Je confirme que je suis là</button>
            ${cmd.page_confirmation ? `<a class="link" href="${esc(cmd.page_confirmation)}" data-spa>ou mon lien de confirmation</a>` : ''}</div>` : ''}
@@ -898,7 +924,7 @@ async function vueSuivi(ref = '', tel = '') {
         ${cmd.lignes.filter((l) => l.produit_slug).slice(0, 2).map((l) => `<a class="btn sm gold" href="/produit/${esc(l.produit_slug)}?avis=1" data-spa data-note="${esc(l.produit_slug)}">Noter « ${esc(l.titre.slice(0, 26))} »</a>`).join(' ')}
       </div>` : ''}
       <div class="row" style="flex-wrap:wrap;margin-top:6px">
-        <a class="btn ghost sm" href="https://wa.me/${esc((cfg.whatsapp || '').replace(/\D/g, ''))}?text=${encodeURIComponent('Commande ' + cmd.reference + ' — j’ai un souci / question.')}" target="_blank" rel="noopener">💬 WhatsApp</a>
+        <a class="btn ghost sm" href="https://wa.me/${esc((cfg.whatsapp || '').replace(/\D/g, ''))}?text=${encodeURIComponent('Commande ' + cmd.reference + ' — j’ai un souci / question.')}" target="_blank" rel="noopener">${icone('whatsapp', { taille: 16 })} WhatsApp</a>
         ${cmd.statut === 'nouvelle' && cmd.statut_paiement !== 'paye' ? '<button class="btn danger sm" data-cancel-ref="' + esc(cmd.reference) + '">Annuler</button>' : ''}
         <a class="btn sm ghost" href="/" data-spa>Nouvelle commande</a>
       </div>
@@ -922,7 +948,7 @@ async function render() {
         const trouve = cats.find((x) => String(x.slug || x.id) === c[1] || String(x.id) === c[1]);
         state.filtreCat = trouve ? String(trouve.id) : null;
       }
-      html = await vueBoutique();
+      html = await vueBoutique({ accueil: /^\/$/.test(path.split('?')[0]) });
     }
     else if (m(/^\/produit\/([^/?]+)/)) html = await vueProduit(m(/^\/produit\/([^/?]+)/)[1]);
     else if (m(/^\/panier/)) html = await vuePanier();
@@ -937,9 +963,14 @@ async function render() {
     else if (m(/^\/favoris/)) html = await vueFavoris();
     else if (m(/^\/(faq|retours|livraison|a-propos)/)) html = await vueContenu(m(/^\/(faq|retours|livraison|a-propos)/)[1]);
     else html = await vueBoutique();
-    root.innerHTML = html;
+    /* dernier filtre : si un texte saisi dans le back-office contient un emoji,
+       il ressort en tracé dessiné — la boutique garde une seule langue graphique */
+    root.innerHTML = typeof sansPictos === 'function' ? sansPictos(html) : html;
     bind(html);
     Cart.renderBadge();
+    /* le mouvement est branché après chaque rendu : il ne doit jamais
+       empêcher une page de s'afficher, d'où le try/catch. */
+    if (typeof Mouvement !== 'undefined') { try { Mouvement.appliquer(root); } catch (e) { /* rien */ } }
     /* un vieux lien #/produit/5 est remplacé par l'URL lisible, sans rechargement */
     if (location.hash && window.history && history.replaceState) history.replaceState(null, '', routeCourante());
     Mesure.vider();
@@ -1013,6 +1044,7 @@ function bind() {
       if (p.tailles?.length || p.coloris?.length) return go('/produit/' + id);
       Cart.add(p, { quantite: 1 });
       toast('Ajouté au panier ✔ ' + p.titre, 'ok');
+      if (typeof Mouvement !== 'undefined') Mouvement.voler(btn, document.querySelector('[data-cart-count]'));
     }));
 
   document.querySelectorAll('[data-cat]').forEach((b) =>
@@ -1049,7 +1081,7 @@ function bindProduit() {
   const majDispo = () => {
     const s = stockPour(p, v.taille, v.coloris);
     const d = document.getElementById('pd-dispo');
-    if (d) d.innerHTML = s > 0 ? `✔ <b>${s}</b> en stock${v.taille ? ' en taille ' + esc(v.taille) : ''}` : '✖ Combinaison épuisée';
+    if (d) d.innerHTML = s > 0 ? `${icone('check', { taille: 15 })} <b>${s}</b> en stock${v.taille ? ' en taille ' + esc(v.taille) : ''}` : `${icone('alerte', { taille: 15 })} Combinaison épuisée`;
     const price = document.getElementById('pd-price');
     if (price) price.textContent = money(p.prix);
     v.qte = Math.min(v.qte, Math.max(1, s));
@@ -1119,12 +1151,13 @@ function bindProduit() {
     if (e.key === 'ArrowLeft') afficherPhoto(Math.max(0, v.idx - 1));
   });
 
-  const ajouter = () => {
+  const ajouter = (ev) => {          /* ev : le bouton pressé, pour l'animation du panier */
     if (p.tailles.length && !v.taille) return toast('Choisis une taille.', 'ko');
     if (stockPour(p, v.taille, v.coloris) < 1) return toast('Cette combinaison est épuisée.', 'ko');
     Cart.add(p, { taille: v.taille, coloris: v.coloris, quantite: v.qte });
     Mesure.envoyer('ajout_panier', p.id, v.taille || '');
     toast('Ajouté au panier ✔', 'ok');
+    if (typeof Mouvement !== 'undefined') Mouvement.voler(ev && ev.target ? ev.target : document.querySelector('[data-buy]'), document.querySelector('[data-cart-count]'));
   };
   document.querySelector('[data-buy]')?.addEventListener('click', ajouter);
   document.querySelector('[data-checkout]')?.addEventListener('click', () => { ajouter(); go('/commande'); });
@@ -1145,7 +1178,7 @@ function bindProduit() {
 function ouvrirLoupe(p, idx) {
   const images = p.images.length ? p.images : [{ url: p.image, legende: p.titre }];
   const m = el(`<div class="modal loupe" role="dialog" aria-modal="true" aria-label="Photo en grand de ${esc(p.titre)}">
-    <button class="close" data-x aria-label="Fermer">✕</button>
+    <button class="close" data-x aria-label="Fermer">${icone("croix")}</button>
     <div class="loupe-cadre" data-cadre><img alt="${esc(p.titre)}" src="${esc(images[idx].grande || images[idx].url)}" /></div>
     <div class="loupe-aide">Survole ou touche pour zoomer · <span class="mono">${idx + 1}/${images.length}</span>${images[idx].legende ? ' · ' + esc(images[idx].legende) : ''}</div>
     ${images.length > 1 ? '<button class="loupe-nav prev" data-nav="-1" aria-label="Photo précédente">‹</button><button class="loupe-nav next" data-nav="1" aria-label="Photo suivante">›</button>' : ''}
@@ -1200,7 +1233,7 @@ function ouvrirTrouveTaille(p) {
   const tailles = Object.keys(guide);
   if (!tailles.length) return toast('Pas encore de mesures pour cet article.', 'ko');
   const m = el(`<div class="modal" role="dialog" aria-modal="true" aria-label="Trouver ma taille"><div class="sheet" style="max-width:460px">
-    <div class="hd"><h3 style="margin:0">Trouver ma taille</h3><button class="close" data-x aria-label="Fermer">✕</button></div>
+    <div class="hd"><h3 style="margin:0">Trouver ma taille</h3><button class="close" data-x aria-label="Fermer">${icone("croix")}</button></div>
     <div class="stack">
       <p class="small muted">Trois réponses, sans compte ni donnée gardée : on compare à la grille de cet article.</p>
       <div class="mini-form">
@@ -1262,7 +1295,7 @@ function ouvrirTrouveTaille(p) {
 function ouvrirAvis(p) {
   const pend = JSON.parse(localStorage.getItem('fatoucha_pending') || '{}');
   const m = el(`<div class="modal" role="dialog" aria-modal="true" aria-label="Laisser un avis"><div class="sheet" style="max-width:520px">
-    <div class="hd"><h3 style="margin:0">Votre avis sur « ${esc(p.titre)} »</h3><button class="close" data-x aria-label="Fermer">✕</button></div>
+    <div class="hd"><h3 style="margin:0">Votre avis sur « ${esc(p.titre)} »</h3><button class="close" data-x aria-label="Fermer">${icone("croix")}</button></div>
     <div class="stack">
       <div class="opt"><span class="lbl">Note</span><div class="chips note-choix" id="av-note">
         ${[1, 2, 3, 4, 5].map((n) => `<button class="chip ${n === 5 ? 'on' : ''}" data-note="${n}" aria-label="${n} étoile${n > 1 ? 's' : ''}">${'★'.repeat(n)}</button>`).join('')}
@@ -1342,11 +1375,11 @@ function ouvrirAvis(p) {
 function ouvrirPartage(p) {
   const lien = location.origin + lienProduit(p);
   const m = el(`<div class="modal" role="dialog" aria-modal="true" aria-label="Partager"><div class="sheet" style="max-width:440px">
-    <div class="hd"><h3 style="margin:0">Partager cet article</h3><button class="close" data-x aria-label="Fermer">✕</button></div>
+    <div class="hd"><h3 style="margin:0">Partager cet article</h3><button class="close" data-x aria-label="Fermer">${icone("croix")}</button></div>
     <div class="stack">
       <div class="copy"><span class="num">${esc(lien)}</span><button class="btn sm ghost" data-copy>Copier</button></div>
-      <a class="btn gold block" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent('Regarde : ' + p.titre + ' — ' + money(p.prix) + ' ' + lien)}">💬 Envoyer sur WhatsApp</a>
-      <a class="btn ghost block" target="_blank" rel="noopener" href="https://api.whatsapp.com/send?phone=${esc((Shop.cfg?.whatsapp || '').replace(/\\D/g, ''))}&text=${encodeURIComponent(p.titre + ' — ' + money(p.prix) + ' ' + lien)}">💬 Envoyer à la boutique</a>
+      <a class="btn gold block" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent('Regarde : ' + p.titre + ' — ' + money(p.prix) + ' ' + lien)}">${icone('whatsapp', { taille: 16 })} Envoyer sur WhatsApp</a>
+      <a class="btn ghost block" target="_blank" rel="noopener" href="https://api.whatsapp.com/send?phone=${esc((Shop.cfg?.whatsapp || '').replace(/\\D/g, ''))}&text=${encodeURIComponent(p.titre + ' — ' + money(p.prix) + ' ' + lien)}">${icone('whatsapp', { taille: 16 })} Envoyer à la boutique</a>
       <p class="small muted">Surprise à l’arrivée : le lien envoie la photo, le prix et l’article directement dans la conversation.</p>
     </div></div></div>`);
   document.body.appendChild(m);
@@ -1372,7 +1405,7 @@ function bindPanier() {
 function bindPanierSuite() {
   document.querySelector('[data-reprise]')?.addEventListener('click', () => {
     const m = el(`<div class="modal" role="dialog" aria-modal="true" aria-label="Retrouver mon panier"><div class="sheet" style="max-width:440px">
-      <div class="hd"><h3 style="margin:0">Retrouver mon panier</h3><button class="close" data-x aria-label="Fermer">✕</button></div>
+      <div class="hd"><h3 style="margin:0">Retrouver mon panier</h3><button class="close" data-x aria-label="Fermer">${icone("croix")}</button></div>
       <div class="stack">
         <p class="small muted">Si tu avais laissé un panier sur un autre téléphone, donne le numéro utilisé au paiement — et le code de reprise affiché à ce moment-là.</p>
         <div class="field"><label for="rp-tel">Ton numéro</label><input class="inp" id="rp-tel" inputmode="tel" placeholder="77 123 45 67" /></div>
@@ -1449,7 +1482,7 @@ function bindPaiement() {
       }
     } finally {
       btn.disabled = false;
-      if (document.body.contains(btn)) btn.textContent = '💳 Payer ' + money(pend.total || 0);
+      if (document.body.contains(btn)) btn.textContent = 'Payer ' + money(pend.total || 0);
     }
   });
 
@@ -1510,10 +1543,10 @@ function afficherManuel(r) {
         <button class="btn sm ghost" data-copy="${esc(r.numero || '')}">Copier</button>
         ${r.deeplink ? `<a class="btn sm ${isWave ? 'wave' : 'orange'}" href="${esc(r.deeplink)}" target="_blank" rel="noopener">Ouvrir ${isWave ? 'l’app Wave' : 'Orange Money'}</a>` : ''}
       </div>
-      <div class="small muted">${esc(r.message || '')}${r.fallback_ussd ? `<br>⌨️ Ou compose <span class="mono">${esc(r.fallback_ussd)}</span>` : ''}</div>
+      <div class="small muted">${esc(r.message || '')}${r.fallback_ussd ? `<br>${icone('telephone', { taille: 15 })} Ou compose <span class="mono">${esc(r.fallback_ussd)}</span>` : ''}</div>
       <h4 style="margin:6px 0 0">2 · Confirme l’envoi</h4>
       <div class="small muted">Envoie la capture de la transaction sur WhatsApp pour une validation express :</div>
-      <a class="btn gold" target="_blank" rel="noopener" href="https://wa.me/${esc((Shop.cfg?.whatsapp || '').replace(/\D/g, ''))}?text=${encodeURIComponent('J’ai envoyé ' + r.montant + ' F (ref ' + r.reference + '). Voici la capture du paiement.')}" style="width:100%">💬 Envoyer la preuve</a>
+      <a class="btn gold" target="_blank" rel="noopener" href="https://wa.me/${esc((Shop.cfg?.whatsapp || '').replace(/\D/g, ''))}?text=${encodeURIComponent('J’ai envoyé ' + r.montant + ' F (ref ' + r.reference + '). Voici la capture du paiement.')}" style="width:100%">${icone('whatsapp', { taille: 16 })} Envoyer la preuve</a>
       <hr style="border:0;border-top:1px dashed var(--line)" />
       <div class="row" style="flex-wrap:wrap">
         <button class="btn sm ghost" data-jai-paye>J’ai payé — vérifier</button>
@@ -1527,7 +1560,7 @@ function afficherManuel(r) {
   box.querySelector('[data-jai-paye]')?.addEventListener('click', async (e) => {
     e.target.textContent = 'Vérification…';
     const ok = await verifierPaiement(hashPath().match(/([\w-]+)$/)?.[1], e.target);
-    if (!ok) { e.target.textContent = 'Pas encore vu — envoie la preuve 😉'; }
+    if (!ok) { e.target.textContent = 'Pas encore vu — envoie la preuve'; }
   });
 }
 
@@ -1537,7 +1570,7 @@ async function verifierPaiement(ref, btn) {
       const s = await API.get('/api/paiement/statut/' + encodeURIComponent(ref));
       if (s.statut_paiement === 'paye') {
         if (btn) btn.textContent = 'Paiement reçu ✔';
-        toast('Paiement confirmé, commande validée 🎉', 'ok');
+        toast('Paiement confirmé, commande validée', 'ok');
         setTimeout(() => go('/commande/' + ref), 700);
         return true;
       }
@@ -1574,7 +1607,7 @@ function bindSuivi() {
 
 function openSearch() {
   const m = el(`<div class="modal"><div class="sheet" style="max-width:560px">
-    <div class="hd"><h3 style="margin:0">🔍 Rechercher un article</h3><button class="close" data-x>✕</button></div>
+    <div class="hd"><h3 style="margin:0">${icone("recherche", { taille: 17 })} Rechercher un article</h3><button class="close" data-x aria-label="Fermer">${icone("croix")}</button></div>
     <input class="inp" id="q" placeholder="robe, sac, parfum, montre…" autocomplete="off" />
     <div class="small muted" style="margin-top:8px">Astuce : tape une taille ou un prix — « robe 15000 », « sac ».</div>
     <div class="stack" style="margin-top:10px;max-height:44vh;overflow:auto" id="qres"></div>

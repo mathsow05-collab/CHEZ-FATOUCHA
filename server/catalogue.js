@@ -254,7 +254,9 @@ function produitPublic(row) {
     description: row.description || '',
     prix: row.prix,
     prix_barre: row.prix_barre || null,
-    marque: row.marque || null,
+    /* `marque` (« marque / origine » dans l'espace vendeur : SHEIN, TEMU, vendeur local…) reste
+       interne, comme le prix d'achat et le lien fournisseur : c'est la source de la
+       boutique, pas un argument de vente. La marque mise en avant reste celle de la maison. */
     delai_jours: row.delai_jours,
     video_url: row.video_url || null,
     mannequin: row.mannequin || null,

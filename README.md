@@ -115,10 +115,29 @@ ne donne aucun accès.)
 ### Le thème — « Prestige » (boutique et admin)
 
 Registre maison de mode : **ivoire chaud** `#f7f3ec`, **encre aubergine** `#241a22` (jamais de noir
-pur), **bordeaux** `#6d1f46` en accent, **or champagne** `#b8912f` en filets, **titres en serif**
-(Hoefler Text / Didot), capitales espacées (`.12–.2em`) sur les micro-labels, rayons serrés
-(`--r: 10px`, `--r-lg: 16px`), hairlines au lieu d'encadrements, cartes produit sans bordure avec
-zoom photo au survol, hero sombre à filet or + visuel éditorial, favicon en monogramme « CF ».
+pur), **bordeaux** `#6d1f46` en accent, **or champagne** `#b8912f` en filets, **titres en serif**,
+capitales espacées (`.12–.2em`) sur les micro-labels, rayons serrés (`--r: 10px`), hairlines au lieu
+d'encadrements, cartes produit sans bordure avec zoom photo au survol, hero sombre à filet or +
+visuel éditorial, favicon en monogramme « CF ».
+
+**Les polices sont embarquées, pas espérées.** Fraunces (serif) et Manrope (sans) en variables woff2,
+servies depuis `public/media/polices/` et préchargées dans le `<head>` (`npm run smoke` vérifie que
+les quatre fichiers sortent du serveur, pas seulement que la feuille les déclare) : le site a la même
+tête sur un Android d'entrée de gamme que sur un Mac. `--serif` / `--sans` gardent une pile de repli.
+
+**Les pictogrammes colorés sont bannis de l'interface.** À la place : un jeu de 63 icônes SVG
+dessinées à la main (`public/js/icones.js`), trait 1,7, animées au survol et au toucher — recherche,
+panier, cœur, menu↔croix, camion qui roule, étiquette, cadenas… Le même module sert au rendu serveur
+(`server/pages.js`) et au navigateur, donc la page est déjà ornée avant que le JavaScript parle. Et
+comme le champ « marque / origine » ou une description peuvent contenir un emoji, `sansPictos()` le
+convertit en tracé : la boutique garde une seule langue graphique.
+
+**Le mouvement est une couche à part** (`public/js/mouvement.js`) : halo qui suit le curseur sur le
+hero, reflet sur les photos, boutons légèrement aimantés, carte qui se incline, révélation au
+défilement, photo qui vole au panier, étincelles au clic, rails avec flèches. Tout est optionnel par
+construction : chaque effet est isolé dans un `try`, `<html>` ne reçoit la classe `mouv` (seule à
+masquer un bloc avant sa révélation) que si le script tourne vraiment, et `prefers-reduced-motion`
+neutralise l'ensemble — une page ne doit jamais rester vide à cause d'une animation.
 
 Tout part des variables en haut de `public/css/style.css` : `--ivoire`, `--nacre`, `--encre`,
 `--bordeaux`, `--or`, `--poussiere`, `--filet`, `--serif`. **Change une ligne, tout le site suit.**
@@ -130,6 +149,18 @@ sans rien resservir. Les règles propres à l'admin (tableaux, KPI, grille de st
 ont quitté `style.css` : la cliente ne télécharge pas le CSS du back-office. `npm run check:css`
 verrouille les deux : syntaxe, variables réellement définies par les feuilles chargées,
 cloisonnement, aucun sélecteur mort. Les contrastes texte/fond sont au niveau AA (4,6:1 à 15:1).
+
+### Cadrage : une page doit tenir dans l'écran
+
+Sur mobile, la navigation horizontale de l'en-tête est remplacée par un bouton et un
+**tiroir** (`/admin` excepté : ses pages s'affichent sans JavaScript utile) ; l'aperçu des
+actions du haut (« Panier », « Chercher », « Menu ») garde une icône et retire son libellé
+sous 900 px. `img { height:auto }` et `svg { height:auto }` sont posés au sommet de la
+feuille : sans eux, un `height="1200"` lu dans le HTML étire la photo en bande verticale —
+c'est ce que tu voyais « sortir du cadre ». Enfin, `/boutique` a son **propre rendu** (titre
+`Tous les articles`, pas de hero, pas de rails) au lieu d'emprunter celui de l'accueil : la
+page ne saute plus d'un contenu à l'autre à l'hydratation, et `npm run test:front` le vérifie
+en comparant le titre rendu par le serveur avec celui laissé par le client.
 
 ### Règles métier codées
 - **Stock réservé dès la commande** (décrémenté), **remis en rayon** si la commande est annulée.
@@ -303,16 +334,18 @@ dans `render.yaml`). Alternative gratuite : sauvegarder régulièrement `data/fa
 npm run check:css    # 8 checks : thème (palette Prestige), variables réellement définies, aucun
                      # sélecteur mort (le CSS qui ne sert à rien est une dette), cloisonnement
                      # boutique / back-office
-npm run smoke        # 185 checks : catalogue, commande, stock par variante, paiement, admin, zones,
-                     # sécurité ; rendu serveur + balisage + sitemap + robots ; pipeline d'images
+npm run smoke        # 198 checks : catalogue, commande, stock par variante, paiement, admin, zones,
+                     # sécurité ; rendu serveur + balisage + sitemap + robots ; polices réellement servies ; pipeline d'images
                      # (AVIF plus léger que WebP, cache disque, chemin tordu refusé) ; avis et
                      # modération ; alertes de retour en stock ; panier enregistré et reprise ;
                      # événements et entonnoir ; pages de contenu (markdown, échappement) ;
                      # acompte COD et confirmation ; « rien, côté cliente, ne mène au back-office »
-npm run test:front   # 93 checks : parcours client réel dans un DOM (jsdom) — catalogue filtré, fiche
+npm run test:front   # 101 checks : parcours client réel dans un DOM (jsdom) — catalogue filtré, fiche
                      # (vignettes, loupe, guide, calculateur de taille, avis envoyé), panier et reprise,
                      # commande, paiement, suivi — puis back-office dans sa propre fenêtre (avis,
                      # contenus, entonnoir, création d'un article avec guide et réassurance).
+                     # Chaque URL est aussi comparée « serveur vs client » : un titre qui change à l'hydratation
+                     # est une page qui saute aux yeux, donc c'est une erreur.
                      # Le test échoue si la moindre erreur JavaScript apparaît pendant le parcours.
 ```
 

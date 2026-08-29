@@ -3,7 +3,7 @@
    encore le catalogue quand la connexion tombe. Rien d'automatique côté argent :
    les pages de commande, de paiement et le back-office ne sont jamais mis en
    cache, pour qu'aucune cliente ne voie un prix ou un stock périmé. */
-const VERSION = 'fatoucha-v1';
+const VERSION = 'fatoucha-v3';
 const MAX_IMG = 80;
 
 const JAMAIS = [/^\/api\/admin/, /^\/api\/commandes/, /^\/api\/paiement/, /^\/admin/, /\/(panier|commande|paiement)/];
@@ -14,7 +14,8 @@ const estPour = (reg, url) => reg.some((r) => r.test(url));
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(['/css/style.css', '/js/api.js', '/js/app.js', '/manifest.webmanifest', '/media/favicon.svg'])).catch(() => {}));
+  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(['/css/style.css', '/js/icones.js', '/js/mouvement.js', '/js/api.js', '/js/app.js', '/manifest.webmanifest', '/media/favicon.svg',
+        '/media/polices/fraunces-latin-standard-normal.woff2', '/media/polices/manrope-latin-wght-normal.woff2', '/media/polices/fraunces-latin-standard-italic.woff2', '/media/polices/manrope-latin-ext-wght-normal.woff2'])).catch(() => {}));
 });
 
 self.addEventListener('activate', (e) => {

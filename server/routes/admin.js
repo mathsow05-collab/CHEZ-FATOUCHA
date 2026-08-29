@@ -141,6 +141,10 @@ router.get('/produits', (req, res) => {
     rows.map((r) => ({
       ...produitPublic(r),
       actif: !!r.actif,
+      /* trois champs que la boutique garde pour elle : prix d'achat, lien du
+         fournisseur, marque / origine de la pièce. `produitPublic` ne les envoie
+         jamais à la cliente — c'est ici qu'ils reviennent, côté vendeur. */
+      marque: r.marque || '',
       prix_achat: r.prix_achat,
       lien_source: r.lien_source || '',
       updated_at: r.updated_at,

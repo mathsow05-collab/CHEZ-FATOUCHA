@@ -12,6 +12,8 @@
    cliente et ce que voit un moteur de recherche sont la même page. */
 const { db, getSetting } = require('./db');
 const optima = require('./optima');
+/* Le même jeu d'icônes animées que le front : un seul fichier, deux mondes. */
+const { icone, puceCategorie: puce } = require('../public/js/icones.js');
 const {
   produitPublic,
   listerProduits,
@@ -29,8 +31,10 @@ const fcfa = (n) => `${nf.format(Math.round(Number(n) || 0))} F`;
 const jplural = (n) => (Number(n) > 1 ? 'jours' : 'jour');
 
 /* ---------------- morceaux communs ---------------- */
-function entete(cfg, actif = '') {
+function entete(cfg, actif = '', options = {}) {
+  const { menu = true } = options;
   const nom = cfg.nom_boutique || 'CHEZ FATOUCHA';
+  const wa = String(cfg.whatsapp || cfg.telephone || '').replace(/\D/g, '');
   const mono = nom.replace(/[^\p{L}\s]/gu, ' ').split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]).join('').toUpperCase();
   return `<header class="top"><div class="wrap bar">
     <a class="brand" href="/"${actif === 'boutique' ? ' aria-current="page"' : ''}>
@@ -43,10 +47,20 @@ function entete(cfg, actif = '') {
       <a href="/faq" class="${actif === 'faq' ? 'on' : ''}">Questions fréquentes</a>
     </nav>
     <div class="actions">
-      <a class="icon-btn" href="/boutique?q=" title="Rechercher un article" aria-label="Rechercher">🔍</a>
-      <a class="icon-btn" href="/panier" title="Panier" aria-label="Panier">🧺<span class="count">0</span></a>
+      <a class="icon-btn" href="/boutique?q=" title="Rechercher un article" aria-label="Rechercher">${icone('recherche', { taille: 18 })}<span class="libelle">Chercher</span></a>
+      <a class="icon-btn" href="/panier" title="Panier" aria-label="Panier">${icone('panier', { taille: 18 })}<span class="count">0</span></a>${menu ? `
+      <button class="burger" data-tiroir aria-expanded="false" aria-controls="tiroir" aria-label="Ouvrir le menu">${icone('menu', { taille: 20 })}</button>` : ''}
     </div>
-  </div></header>
+  </div></header>${menu ? `
+  <nav class="tiroir" id="tiroir" aria-label="Menu">
+    <div class="tete"><b>${ech(nom)}</b><button class="close" data-tiroir-x aria-label="Fermer le menu">${icone('croix')}</button></div>
+    <a href="/boutique"${actif === 'boutique' ? ' aria-current="page"' : ''}>Boutique${icone('fleche', { taille: 16 })}</a>
+    <a href="/suivi"${actif === 'suivi' ? ' aria-current="page"' : ''}>Suivre ma commande${icone('colis', { taille: 16 })}</a>
+    <a href="/faq"${actif === 'faq' ? ' aria-current="page"' : ''}>Questions fréquentes${icone('discuter', { taille: 16 })}</a>
+    <a href="/panier">Panier${icone('panier', { taille: 16 })}</a>
+    <div class="base">${wa ? `<a class="btn gold block" href="https://wa.me/${ech(wa)}" target="_blank" rel="noopener">${icone('whatsapp', { taille: 17 })} Écrire à la boutique</a>` : ''}</div>
+  </nav>
+  <div class="tiroir-fond" data-tiroir-fond aria-hidden="true"></div>` : ''}
   <div class="marquee"><div class="wrap">
     <span>Livraison <b>Dakar dès 1 000 F</b> · régions dès <b>3 000 F</b></span>
     <span>Retrait boutique <b>offert</b></span>
@@ -60,7 +74,7 @@ function pied(cfg) {
     <div>
       <h4>${ech(cfg.nom_boutique || 'Chez Fatoucha')}</h4>
       <div>${ech(cfg.boutique_description || '')}</div>
-      <div class="pied-ligne">📍 ${ech(cfg.adresse_retrait || '')}<br />🕘 ${ech(cfg.horaires_retrait || '')}</div>
+      <div class="pied-ligne">${icone('localisation', { taille: 14 })} ${ech(cfg.adresse_retrait || '')}<br />${icone('sablier', { taille: 14 })} ${ech(cfg.horaires_retrait || '')}</div>
     </div>
     <div>
       <h4>Aide</h4>
@@ -88,7 +102,7 @@ function carte(p) {
   ].filter(Boolean).join('');
   const note = p.avis?.nombre ? `<span class="mini note-mini">${'★'.repeat(Math.round(p.avis.moyenne))} ${p.avis.moyenne} (${p.avis.nombre})</span>` : '';
   return `<article class="card" data-go="${ech(lien)}">
-    <div class="ph">
+    <div class="ph squelette">
       <a href="${ech(lien)}" tabindex="-1" aria-hidden="true">${optima.baliseImage(p.image, p.titre, { sizes: '(max-width:640px) 46vw, 300px' })}</a>
       <div class="flags">${flags}</div>
     </div>
@@ -131,14 +145,14 @@ function accueil(req) {
 
   const corps = `
   ${entete(cfg, 'boutique')}
-  <section class="hero"><div class="wrap"><div class="inner">
+  <section class="hero"><div class="wrap"><div class="inner spot">
     <div class="txt">
-      <span class="sur">Sélection &amp; pièces choisies · Dakar</span>
+      <span class="sur shiny">Sélection &amp; pièces choisies · Dakar</span>
       <h1>La mode qui t’aime, <em>livrée à ta porte</em>.</h1>
       <p>Robes, ensembles, sacs, chaussures, parfums… choisis ta taille et ta quantité, paie par Wave ou Orange Money. On livre à Dakar et dans toutes les régions — ou tu viens retirer à la boutique.</p>
       <div class="cta">
-        <a class="btn gold big" href="/boutique">Voir les ${total} articles</a>
-        <a class="btn ghost big" href="/suivi">📦 Suivre ma commande</a>
+        <a class="btn gold big" href="/boutique" data-aimant="8">Voir les ${total} articles</a>
+        <a class="btn ghost big" href="/suivi">${icone("colis", { taille: 17 })} Suivre ma commande</a>
       </div>
       <div class="stats">
         <div><b>${dispo}</b> articles disponibles</div>
@@ -147,15 +161,15 @@ function accueil(req) {
         <div><b>Wave / OM</b> paiement direct</div>
       </div>
     </div>
-    <figure class="visuel">
+    <figure class="visuel ornee">
       ${optima.baliseImage('/media/demo/lookbook.jpg', 'Silhouette de la sélection Chez Fatoucha', { sizes: '(max-width:900px) 92vw, 460px', priorité: true })}
       <figcaption>La sélection Fatoucha</figcaption>
     </figure>
   </div></div></section>
 
   <section class="blk"><div class="wrap"><div class="cats">
-    <button class="cat on" data-cat="">✨ Tout</button>
-    ${cats.map((c) => `<a class="cat" href="/categorie/${ech(c.slug || c.id)}">${ech(c.emoji)} ${ech(c.name)} <span class="n">${c.n}</span></a>`).join('')}
+    <button class="cat on" data-cat="">Tout</button>
+    ${cats.map((c) => `<a class="cat" href="/categorie/${ech(c.slug || c.id)}">${puce(c.emoji)}${ech(c.name)} <span class="n">${c.n}</span></a>`).join('')}
   </div></div></section>
 
   ${rangee('Sélection de Fatou', 'Les pièces qu’elle met en avant cette semaine.', vedettes.length ? vedettes : recents.slice(0, 6))}
@@ -239,7 +253,7 @@ function boutique(req, { q = '', categorie = null, tri = 'recent', taille = '', 
         <button class="btn sm" type="submit">Filtrer</button>
       </form>
     </div>
-    ${rows.length ? `<div class="grid">${rows.map(carte).join('')}</div>` : '<div class="empty"><div class="big">🧺</div>Aucun article ne correspond à cette recherche.</div>'}
+    ${rows.length ? `<div class="grid">${rows.map(carte).join('')}</div>` : `<div class="empty"><div class="big">${icone('recherche', { taille: 34 })}</div>Aucun article ne correspond à cette recherche.</div>`}
   </div></section>
   ${pied(cfg)}`;
   return pageHTML({
@@ -313,26 +327,26 @@ function produit(req, row) {
     </div>
     <div class="stack">
       <div>
-        <div class="row"><span class="pill teal">${p.en_rupture ? 'Rupture de stock' : p.stock <= 3 ? `Plus que ${p.stock} en stock` : '✔ Disponible'}</span>${p.marque ? `<span class="pill">${ech(p.marque)}</span>` : ''}</div>
+        <div class="row"><span class="pill teal">${p.en_rupture ? 'Rupture de stock' : p.stock <= 3 ? `Plus que ${p.stock} en stock` : '✔ Disponible'}</span><span class="pill">${ech((cfg.nom_boutique || 'Chez Fatoucha'))} sélection</span></div>
         <h1>${ech(p.titre)}</h1>
         <div class="pricebox"><span class="price">${fcfa(p.prix)}</span>${p.prix_barre ? `<s class="muted">${fcfa(p.prix_barre)}</s>` : ''}</div>
         ${resume.nombre ? `<a class="lien-avis" href="#avis">${etoiles(resume.moyenne)} <b>${resume.moyenne}/5</b> · ${resume.nombre} avis</a>` : `<span class="lien-avis">Aucun avis pour l’instant — sois la première à noter.</span>`}
       </div>
       ${p.description ? `<div class="bloc"><h3>Description</h3><div class="desc">${ech(p.description)}</div></div>` : ''}
-      ${p.mannequin ? `<div class="puce-mannequin">📏 ${ech(p.mannequin)}</div>` : ''}
+      ${p.mannequin ? `<div class="puce-mannequin">${icone('regle', { taille: 15 })} ${ech(p.mannequin)}</div>` : ''}
       ${p.tailles.length ? `<div class="opt"><span class="lbl">Taille</span><div class="chips">${p.tailles.map((t) => `<button class="chip" data-taille="${ech(t)}">${ech(t)}</button>`).join('')}</div></div>` : ''}
       ${Object.keys(guide).length ? `<div class="bloc"><h3>Guide des tailles (cm)</h3>
         <table class="guide"><thead><tr><th>Taille</th><th>Poitrine</th><th>Taille</th><th>Hanches</th></tr></thead>
         <tbody>${Object.entries(guide).map(([t, m]) => `<tr><td><b>${ech(t)}</b></td><td>${m.poitrine ?? '—'}</td><td>${m.taille ?? '—'}</td><td>${m.hanches ?? '—'}</td></tr>`).join('')}</tbody></table>
         <p class="small muted">Mesures du vêtement à plat ×2. Entre deux tailles ? Prends la plus grande : on échange sous 48 h.</p></div>` : ''}
       <div class="info-lines">
-        <div class="li"><i>🚚</i><div><b>Livraison</b> — article commandé au fournisseur sous ~${p.delai_jours} ${jplural(p.delai_jours)}, puis Dakar 24-36 h, régions 2-4 j.</div></div>
-        <div class="li"><i>🏪</i><div><b>Retrait gratuit</b> — ${ech(cfg.adresse_retrait || '')} · ${ech(cfg.horaires_retrait || '')}</div></div>
-        <div class="li"><i>📱</i><div><b>Paiement</b> — Wave, Orange Money, ou espèces à la livraison.</div></div>
-        <div class="li"><i>🔁</i><div><b>Échange</b> — <a href="/retours">taille non conforme ?</a> Préviens-nous sur WhatsApp sous 48 h.</div></div>
+        <div class="li"><i>${icone("camion")}</i><div><b>Livraison</b> — article commandé au fournisseur sous ~${p.delai_jours} ${jplural(p.delai_jours)}, puis Dakar 24-36 h, régions 2-4 j.</div></div>
+        <div class="li"><i>${icone("boutique")}</i><div><b>Retrait gratuit</b> — ${ech(cfg.adresse_retrait || '')} · ${ech(cfg.horaires_retrait || '')}</div></div>
+        <div class="li"><i>${icone("carte")}</i><div><b>Paiement</b> — Wave, Orange Money, ou espèces à la livraison.</div></div>
+        <div class="li"><i>${icone("echange")}</i><div><b>Échange</b> — <a href="/retours">taille non conforme ?</a> Préviens-nous sur WhatsApp sous 48 h.</div></div>
       </div>
       <div class="cta-fiche"><a class="btn gold big" href="/panier">Ajouter au panier</a>
-        <a class="btn big" href="https://wa.me/${ech(String(cfg.whatsapp || '').replace(/\D/g, ''))}?text=${encodeURIComponent(`Salam ! Je suis intéressée par « ${p.titre} » (${fcfa(p.prix)}) — ${cfg._url}/produit/${p.slug || p.id}`)}" rel="noopener">💬 Commander sur WhatsApp</a>
+        <a class="btn big" href="https://wa.me/${ech(String(cfg.whatsapp || '').replace(/\D/g, ''))}?text=${encodeURIComponent(`Salam ! Je suis intéressée par « ${p.titre} » (${fcfa(p.prix)}) — ${cfg._url}/produit/${p.slug || p.id}`)}" rel="noopener">${icone("whatsapp", { taille: 16 })} Commander sur WhatsApp</a>
       </div>
     </div>
   </div></div>
@@ -357,7 +371,7 @@ function produit(req, row) {
       productID: p.slug || String(p.id),
       description: (p.description || `${p.titre} — ${cfg.nom_boutique}`).slice(0, 480),
       image: images.map((im) => cfg._url + (im.grande || im.url)),
-      brand: p.marque ? { '@type': 'Brand', name: p.marque } : { '@type': 'Brand', name: cfg.nom_boutique || 'Chez Fatoucha' },
+      brand: { '@type': 'Brand', name: cfg.nom_boutique || 'Chez Fatoucha' },
       offers: {
         '@type': 'Offer',
         url: cfg._url + (p.url || `/produit/${p.id}`),
@@ -524,6 +538,8 @@ function pageHTML({ cfg, titre, description, url, image, type = 'website', prix 
   <link rel="apple-touch-icon" href="/media/icone-192.png" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="stylesheet" href="/css/style.css" />
+  <link rel="preload" href="/media/polices/fraunces-latin-standard-normal.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/media/polices/manrope-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
   ${schema}
 </head>
 <body>
@@ -532,7 +548,9 @@ function pageHTML({ cfg, titre, description, url, image, type = 'website', prix 
 ${corps}
   </div>
   <div id="toast-root" aria-live="polite"></div>
-  <noscript><div class="wrap"><div class="banner warn">Le site a besoin de JavaScript pour le panier et le paiement — les prix, photos et guide des tailles restent lisibles ici. 📱 WhatsApp : <a href="https://wa.me/${ech(String(cfg.whatsapp || '').replace(/\D/g, ''))}">${ech(cfg.telephone || '')}</a></div></div></noscript>
+  <noscript><div class="wrap"><div class="banner warn">Le site a besoin de JavaScript pour le panier et le paiement — les prix, photos et guide des tailles restent lisibles ici. WhatsApp : <a href="https://wa.me/${ech(String(cfg.whatsapp || '').replace(/\D/g, ''))}">${ech(cfg.telephone || '')}</a></div></div></noscript>
+  <script src="/js/icones.js"></script>
+  <script src="/js/mouvement.js"></script>
   <script src="/js/api.js"></script>
   <script src="/js/app.js"></script>
 </body>
@@ -562,7 +580,7 @@ function confirmation(req, { cmd, dejaConfirme = false, ok = false, erreur = '',
   /* `introuvable` : référence inconnue ou code qui ne colle pas. On n'affiche alors
      ni le récapitulatif ni le bouton « je confirme » — il n'y a rien à confirmer. */
   const corps = `
-  ${entete(cfg)}
+  ${entete(cfg, '', { menu: false })}
   <section class="blk"><div class="wrap center cadre-confiance">
     <h1>${introuvable ? 'Ce lien ne correspond à aucune commande' : cmd.statut === 'annulee' ? 'Cette commande est annulée' : ok || dejaConfirme || cmd.client_confirme_le ? 'Commande confirmée ✔' : 'Confirme ta commande'}</h1>
     ${introuvable
