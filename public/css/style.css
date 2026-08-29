@@ -749,6 +749,36 @@ h2, h3 { font-family: var(--serif); font-weight: 400; letter-spacing: -.006em }
 .vod-fond { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .5 }
 .vod-cadre iframe { display: block; position: relative; width: 100%; aspect-ratio: 16 / 9; border: 0 }
 .vod-cadre.vertical iframe { aspect-ratio: 9 / 16; max-height: 78vh }
+/* --- le lecteur habillé : notre peau pose les commandes sur le cadre --- */
+.vod-peau { position: absolute; inset: 0; display: flex; align-items: flex-end; cursor: pointer;
+  background: linear-gradient(to top, rgba(7, 6, 9, .58), rgba(7, 6, 9, 0) 46%) }
+.vod-controles { display: flex; align-items: center; gap: 9px; width: 100%; padding: 10px 12px 11px;
+  transition: opacity .3s var(--eased) }
+.vod-cadre.lit .vod-controles { opacity: 0 }
+.vod-cadre.lit:hover .vod-controles, .vod-cadre.lit:focus-within .vod-controles { opacity: 1 }
+.vod-btn { display: inline-grid; place-items: center; width: 32px; height: 32px; flex: 0 0 auto;
+  color: var(--ivoire); background: rgba(255, 255, 255, .12); border: 1px solid rgba(255, 255, 255, .22);
+  border-radius: 2px; text-decoration: none }
+.vod-btn:hover { color: var(--encre); background: var(--or-clair); border-color: var(--or-clair) }
+.vod-btn-large { width: 40px; height: 40px; background: transparent; border-color: var(--or-soft); color: var(--or-clair) }
+.vod-btn-large:hover { background: var(--or-clair); border-color: var(--or-clair); color: var(--encre) }
+.vod-barre { position: relative; flex: 1 1 auto; height: 22px }
+.vod-barre::before { content: ""; position: absolute; left: 0; right: 0; top: 10px; height: 2px;
+  background: rgba(255, 255, 255, .26) }
+.vod-barre i { position: absolute; left: 0; top: 10px; display: block; width: 0; height: 2px;
+  background: var(--or) }
+.vod-fin { position: absolute; inset: 0; display: grid; place-content: center; gap: 5px; padding: 26px 20px;
+  text-align: center; background: radial-gradient(130% 95% at 50% 0%, rgba(30, 21, 15, .92), rgba(6, 5, 8, .97)) }
+.vod-fin[hidden] { display: none }
+.vod-fin-label { margin: 0; font-size: 10px; letter-spacing: .2em; text-transform: uppercase;
+  color: var(--or-clair) }
+.vod-fin-titre { margin: 0; font-family: var(--serif); font-size: 20px; line-height: 1.2; color: var(--ivoire) }
+.vod-fin-prix { margin: 0; font-size: 13px; color: var(--ivoire-2); opacity: .8 }
+.vod-fin-cta { display: flex; align-items: center; justify-content: center; gap: 9px; margin-top: 10px }
+.vod-fin-lien { justify-self: center; margin-top: 8px; font-size: 11.5px; color: var(--ivoire); opacity: .62;
+  text-decoration: none; border-bottom: 1px solid rgba(255, 255, 255, .28) }
+.vod-fin-lien:hover { opacity: 1 }
+
 .vod-aide { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; flex-wrap: wrap;
   justify-content: center; color: rgba(247, 243, 236, .8) }
 .vod-aide a { color: var(--or-clair); text-decoration: none; border-bottom: 1px solid rgba(217, 185, 104, .4) }

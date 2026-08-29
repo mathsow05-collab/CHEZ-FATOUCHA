@@ -1251,32 +1251,192 @@ function carteVideo(p, images) {
   </a>`;
 }
 
-/* L'autoplay n'est demandé qu'ici, parce que l'ouverture vient d'un geste :
-   sinon la plateforme joue toute seule et rame sur une petite connexion. */
-function avecAutoplay(cadre) {
-  return cadre + (String(cadre).indexOf('?') >= 0 ? '&' : '?') + 'autoplay=1';
-}
+/* L'autoplay n'est demandé qu'à l'ouverture, parce que le geste vient de la
+   cliente : sinon la plateforme joue toute seule et rame sur une petite
+   connexion. Le `origin` posé en même temps sert au pilotage par messages — il
+   doit être exactement l'adresse de la page, sinon le cadre ne répond pas. */
 
+/* ---------------- le lecteur, aux couleurs de la boutique ----------------
+   Ce que la cliente doit oublier pendant qu'elle regarde la pièce : le nom de
+   la chaîne, leur barre, leur logo qui emmène ailleurs, et surtout leur écran
+   de fin — une grille de vidéos d'autres chaînes, où l'article disparaît.
+
+   Trois règles, dans l'ordre d'importance :
+   1. on ne recouvre rien. Les contrôles en moins viennent des paramètres que
+      YouTube autorise (server/videos.js) ; poser un cache sur leur marque est
+      écrit dans leurs conditions et leur donnerait le droit de refuser
+      l'intégration des vidéos de la boutique.
+   2. on ne charge pas leur script. Les commandes (lecture, pause, son,
+      avancer) partent en postMessage vers le cadre : rien de tiers n'exécute
+      dans la page, et la politique de sécurité n'a pas à bouger d'un caractère.
+   3. on met la pause une demi-seconde avant la fin : leur écran de suggestions
+      n'a jamais le temps de s'afficher, et c'est notre carte qui prend la
+      place — le titre, le prix, « revoir », « ajouter au panier ». */
 /* Le referrer du cadre n'est pas un détail de vie privée qu'on peut couper :
    YouTube et Vimeo vérifient l'origine de la page qui les encastre. Avec un
-   iframe en referrerpolicy="no-referrer", le lecteur se refuse et affiche
+   iframe en referrerpolicy="no-referrer", le lecteur se refuse et écrit
    « Video player configuration error » (Error 153) — le HTML, lui, reste net,
    seul l'écran du cadre parle. On envoie donc l'origine seule : ni le chemin
    de la fiche, ni un paramètre de suivi. */
+
+const HOTEAU = 'youtube-nocookie.com';
+
+function hoteDe(url) {
+  try { return new URL(url, location.href).hostname; } catch (e) { return ''; }
+}
+
+/* Seul ce cadre-là se commande sans leur bibliothèque. Pour les autres
+   (TikTok, Instagram, Vimeo), on ne couvre pas ce qu'on ne peut pas piloter :
+   leur propre bouton reste joignable. */
+function pilotable(url) {
+  const h = hoteDe(url);
+  return h === HOTEAU || h.endsWith('.' + HOTEAU);
+}
+
+function urlDuCadre(cadre, avecLecture) {
+  let u = cadre;
+  const joint = () => (u.indexOf('?') >= 0 ? '&' : '?');
+  if (pilotable(cadre)) u += joint() + 'enablejsapi=1&origin=' + encodeURIComponent(location.origin);
+  if (avecLecture) u += joint() + 'autoplay=1';
+  return u;
+}
+
 function ouvrirVideo(p) {
   const v = p.video;
   if (!v || !v.cadre) return;
-  const m = el(`<div class="modal vod" role="dialog" aria-modal="true" aria-label="Vidéo de ${esc(p.titre)}">
+  const src = urlDuCadre(v.cadre, true);
+  const commande = pilotable(src);
+  const vertical = v.format === 'vertical';
+  const m = el(`<div class="modal vod${vertical ? ' vertical' : ''}" role="dialog" aria-modal="true" aria-label="Vidéo de ${esc(p.titre)}">
     <button class="close" data-x aria-label="Fermer la vidéo">${icone('croix')}</button>
-    <div class="vod-cadre${v.format === 'vertical' ? ' vertical' : ''}">
+    <div class="vod-cadre${vertical ? ' vertical' : ''}">
       ${v.miniature ? `<img class="vod-fond" src="${esc(v.miniature)}" alt="" />` : ''}
-      <iframe src="${esc(avecAutoplay(v.cadre))}" title="Vidéo de ${esc(p.titre)}" referrerpolicy="origin" allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write" allowfullscreen></iframe>
+      <iframe src="${esc(src)}" title="Vidéo de ${esc(p.titre)}" referrerpolicy="origin" allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write" allowfullscreen></iframe>
+      ${commande ? `<div class="vod-peau" data-peau>
+        <div class="vod-controles">
+          <button class="vod-btn" type="button" data-jouer aria-label="Lecture ou pause">${icone('pause')}</button>
+          <div class="vod-barre" data-barre><i data-progression></i></div>
+          <button class="vod-btn" type="button" data-silence aria-label="Couper le son">${icone('son')}</button>
+          <a class="vod-btn vod-lien" href="${esc(v.page)}" target="_blank" rel="noopener" aria-label="Vidéo d’origine">${icone('lien')}</a>
+        </div>
+        <div class="vod-fin" data-fin hidden>
+          <p class="vod-fin-label">Chez Fatoucha</p>
+          <h3 class="vod-fin-titre">${esc(p.titre)}</h3>
+          <p class="vod-fin-prix">${money(p.prix)}</p>
+          <div class="vod-fin-cta">
+            <button class="btn gold" type="button" data-suite>${p.stock ? 'Ajouter au panier' : 'Voir la pièce'}</button>
+            <button class="vod-btn vod-btn-large" type="button" data-reprendre aria-label="Revoir la vidéo">${icone('lecture')}</button>
+          </div>
+          <a class="vod-fin-lien" href="${esc(v.page)}" target="_blank" rel="noopener">Vidéo d’origine sur ${esc(v.etiquette)}</a>
+        </div>
+      </div>` : ''}
     </div>
-    <div class="vod-aide">${icone('lecture', { taille: 14 })}<span>La lecture vient de ${esc(v.etiquette)} : ça compte sur ton forfait.</span><a href="${esc(v.page)}" target="_blank" rel="noopener">Ouvrir sur ${esc(v.etiquette)}</a></div>
+    <div class="vod-aide">${icone('lecture', { taille: 14 })}<span>La lecture vient de ${esc(v.etiquette)} : ça compte sur ton forfait.</span>${commande ? '' : `<a href="${esc(v.page)}" target="_blank" rel="noopener">Ouvrir sur ${esc(v.etiquette)}</a>`}</div>
   </div>`);
   document.body.appendChild(m);
+
+  const cadre = m.querySelector('iframe');
+  let cible = '';
+  try { cible = new URL(cadre.src, location.href).origin; } catch (e) {}
+  const peau = m.querySelector('[data-peau]');
+  const barre = m.querySelector('[data-barre]');
+  const jauge = m.querySelector('[data-progression]');
+  const touche = m.querySelector('[data-jouer]');
+  const silence = m.querySelector('[data-silence]');
+  const carte = m.querySelector('[data-fin]');
+  let lu = 0, total = 0, lit = false, muet = false, termine = false;
+
+  /* un message, et c'est tout : {event:"command"} est le format que le cadre
+     attend — celui de leur bibliothèque, sans leur bibliothèque. */
+  const ordre = (func, ...args) => {
+    if (!commande || !cadre.contentWindow) return;
+    try { cadre.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args }), cible); } catch (e) { /* le cadre est déjà parti */ }
+  };
+  const amorce = () => {
+    if (!commande || !cadre.contentWindow) return;
+    try { cadre.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 'fatoucha' }), cible); } catch (e) {}
+  };
+
+  const surMessage = (ev) => {
+    if (!commande || ev.source !== cadre.contentWindow) return;
+    const brut = typeof ev.data === 'string' ? ev.data : '';
+    if (brut.indexOf('"infoDelivery"') < 0) return;
+    let d;
+    try { d = JSON.parse(brut); } catch (e) { return; }
+    const info = (d && d.info) || {};
+    if (info.currentTime) lu = info.currentTime.currentTime || 0;
+    if (info.duration) total = info.duration.duration || 0;
+    const etat = info.playerState ? info.playerState.playerState : null;
+    if (jauge && total > 0) jauge.style.width = (Math.max(0, Math.min(1, lu / total)) * 100).toFixed(2) + '%';
+    if (etat === 1 || etat === 3) { lit = true; m.classList.add('lit'); }
+    if (etat === 2) { lit = false; m.classList.remove('lit'); }
+    if (!termine && (etat === 0 || ((etat === 1 || etat === 3) && total > 0 && total - lu <= 0.4))) {
+      termine = true;
+      ordre('pauseVideo');
+      if (carte) carte.hidden = false;
+      Mesure.envoyer('video_terminee', p.id, v.fournisseur);
+    }
+  };
+  if (commande) {
+    window.addEventListener('message', surMessage);
+    /* le cadre met un instant à se déclarer : deux rappels, pas de boucle */
+    m.__rappels = [setTimeout(amorce, 400), setTimeout(amorce, 1200)];
+  }
+
+  const reprendre = () => {
+    termine = false;
+    if (carte) carte.hidden = true;
+    ordre('seekTo', 0, true);
+    ordre('playVideo');
+    lit = true;
+    m.classList.add('lit');
+    if (touche) touche.innerHTML = icone('pause');
+  };
+  const basculer = () => {
+    if (termine) { reprendre(); return; }
+    lit = !lit;
+    m.classList.toggle('lit', lit);
+    ordre(lit ? 'playVideo' : 'pauseVideo');
+    if (touche) touche.innerHTML = icone(lit ? 'pause' : 'lecture');
+  };
+  if (peau) peau.addEventListener('click', (e) => {
+    if (e.target.closest('button, a')) return;
+    basculer();
+  });
+  if (touche) touche.addEventListener('click', basculer);
+  if (silence) silence.addEventListener('click', () => {
+    muet = !muet;
+    ordre(muet ? 'mute' : 'unMute');
+    silence.innerHTML = icone(muet ? 'muet' : 'son');
+    silence.setAttribute('aria-label', muet ? 'Rendre le son' : 'Couper le son');
+  });
+  if (barre) barre.addEventListener('click', (e) => {
+    if (!total) return;
+    const r = barre.getBoundingClientRect();
+    if (!r.width) return;
+    ordre('seekTo', Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * total, true);
+    if (termine) reprendre();
+  });
+  const relance = m.querySelector('[data-reprendre]');
+  if (relance) relance.addEventListener('click', reprendre);
+  const suite = m.querySelector('[data-suite]');
+  if (suite) suite.addEventListener('click', () => {
+    const dansLaFiche = document.querySelector('[data-buy]');
+    fermer();
+    /* sur la fiche, on rejoue son bouton d'ajout : mêmes règles de taille, même
+       animation, même panier. Ailleurs (page Shorts), on mène d'abord à la fiche. */
+    if (dansLaFiche) dansLaFiche.click();
+    else go('/produit/' + p.id);
+  });
+
   const surTouche = (e) => { if (e.key === 'Escape') fermer(); };
-  const fermer = () => { m.remove(); document.removeEventListener('keydown', surTouche); };
+  function fermer() {
+    if (m.__rappels) m.__rappels.forEach(clearTimeout);
+    window.removeEventListener('message', surMessage);
+    ordre('pauseVideo');
+    m.remove();
+    document.removeEventListener('keydown', surTouche);
+  }
   m.addEventListener('click', (e) => {
     if (e.target === m || e.target.closest('[data-x]')) fermer();
   });

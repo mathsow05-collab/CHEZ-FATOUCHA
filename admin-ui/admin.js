@@ -328,7 +328,7 @@ async function formProduit(p) {
           </div>
           <input type="hidden" id="f-video-mini" value="${esc(data.video_miniature || '')}" />
           <div id="f-video-out" class="small muted"></div>
-          <span class="small muted">Colle le lien de la vidéo que tu as mise sur YouTube (un Short marche aussi) : la fiche montrera une miniature, et la lecture ne démarrera que si la cliente la touche — rien de lourd pour elle. 10 secondes suffisent, le tissu qui bouge. Laisse vide pour n'avoir que les photos.</span>
+          <span class="small muted">Colle le lien de la vidéo que tu as mise sur YouTube (un Short marche aussi) : la fiche montrera une miniature, et la lecture ne démarrera que si la cliente la touche — rien de lourd pour elle. 10 secondes suffisent, le tissu qui bouge. Le lecteur est ensuite habillé par la boutique : leur barre de contrôles disparaît, leur marque reste visible mais ne se clique plus, et la vidéo s'arrête avant leur écran de suggestions — c'est ta fiche qui reprend la main. Rien n'est caché par-dessus chez eux : ce sont leurs propres réglages, et c'est la seule voie qui ne risque pas de faire bloquer tes vidéos. Laisse vide pour n'avoir que les photos. Si l'auteur de la vidéo a fermé l'intégration aux autres sites, YouTube écrira « vidéo indisponible » dans le cadre : dans ce cas, dépose le fichier avec le bouton ci-contre ou choisis une autre vidéo.</span>
         </div>
         <div class="field full"><label>Message « portée par »</label>
           <input class="inp" id="f-mannequin" value="${esc(data.mannequin || '')}" placeholder="Photo portée par Awa, 1,72 m, 58 kg — elle porte du S." />

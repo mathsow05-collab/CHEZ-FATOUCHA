@@ -311,6 +311,49 @@ que celle qui autorise le cadre à l'enregistrement (`HOTES_CADRE` dans
 test refuse tout écart (y compris un `frame-src *`, qui serait une ouverture
 inutile).
 
+#### Le lecteur est habillé par la boutique
+
+Une vidéo de la boutique ne doit pas avoir l'air d'une page YouTube : la cliente
+regarde un article, pas une chaîne. Ce qui est fait, et ce qui ne l'est pas :
+
+- `server/videos.js` porte `REGLAGES_YT`, la liste des réglages **que YouTube
+  honore encore**. Le seul qui change l'écran est `controls=0` : leur barre
+  (progression, rouage, ligne du titre, texte « Watch on YouTube ») ne se
+  dessine pas. `fs=0`, `disablekb=1`, `cc_load_policy=0` et `playsinline=1`
+  suivent. Deux réglages recopiés partout ont été retirés parce qu'ils ne
+  font plus rien : `modestbranding`, abrogé le 15 août 2023 (« has no effect »
+  dit la référence), et `iv_load_policy`, qui visait des annotations supprimées
+  en 2019. Un contrôle du smoke test refuse aussi bien un réglage utile absent
+  qu'un réglage mort revenu.
+- `rel=0` **ne supprime plus les suggestions de fin** depuis 2018 : il les borne
+  à la chaîne qui a publié la vidéo. C'est donc nous qui coupons :
+  `public/js/app.js` écoute ce que le cadre annonce et met la pause un instant
+  avant la fin, puis pose sa propre carte — l'article, son prix, « Revoir »,
+  « Ajouter au panier ». Leur écran de suggestions n'a jamais le temps de
+  s'afficher.
+- Les commandes (lire, pause, son, avancer) partent en `postMessage` vers le
+  cadre, au format qu'il attend. **Aucun script de YouTube n'est chargé dans la
+  page** : la `Content-Security-Policy` ne bouge pas d'un caractère et rien de
+  tiers n'exécute ici.
+- Leur marque reste visible — on ne la recouvre pas, c'est écrit dans leurs
+  conditions d'intégration et ils pourraient fermer l'intégration des vidéos de
+  la boutique. En revanche, `controls=0` ôtant leur barre, la peau de la
+  boutique (`.vod-peau`) reçoit tous les gestes sur le cadre : cinq points
+  mesurés, y compris leurs deux coins, aucun ne part vers youtube.com.
+- Un lecteur qu'on ne peut pas commander (TikTok, Instagram) garde ses propres
+  boutons : on ne couvre jamais ce qu'on ne peut pas piloter. La peau n'est
+  posée que sur ce qu'on pilote.
+
+Mesure à laquelle cet environnement ne suffit pas : YouTube ne donne ici aucune
+vidéo jouable (le lecteur répond « Video unavailable » depuis l'IP du serveur de
+test), donc **le recul effectif de leur interface ne peut pas être compté ici** —
+les chiffres avant/après y sont identiques par construction. Ce qui est vérifié,
+lui : le cadre se configure (pas d'erreur 153), notre peau absorbe les gestes,
+la carte de fin prend la place, et les commandes partent bien au seul lecteur.
+Sur un téléphone réel, c'est donc à l'œil qu'il faut juger — et si un réglage
+devait manquer, il s'ajoute dans `REGLAGES_YT`, une seule fois pour tout le
+monde.
+
 Côté espace vendeur, la liste des articles le dit directement : « 2 articles sur
 8 ont une vidéo, dont 2 en Short (portrait) », et chaque ligne porte
 *Short · YouTube · miniature rangée* ou la mention discrète *sans vidéo* —

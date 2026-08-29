@@ -296,12 +296,75 @@ const J = async (method, url, body, token) => {
       const elCadre = dv.querySelector('.modal.vod iframe');
       check('fiche : le cadre envoie l’origine du site (sinon Error 153 côté lecteur)',
         !!elCadre && elCadre.getAttribute('referrerpolicy') === 'origin', elCadre ? 'referrerpolicy=' + elCadre.getAttribute('referrerpolicy') : 'aucun cadre');
-      check('fiche : la fenêtre vidéo garde une porte de sortie vers la source', !!dv.querySelector('.modal.vod .close') && /youtube\.com\/watch/.test(dv.querySelector('.vod-aide a').getAttribute('href')));
+      /* ---------------- le lecteur habillé ----------------
+         Ce que la cliente ne doit pas voir : leur barre, leur titre, leur écran
+         de suggestions. Ce qu'elle doit pouvoir faire quand même : pause, son,
+         avancer, sortir — par notre peau à nous, sans leur script. */
+      const porte = dv.querySelector('.modal.vod .vod-lien') || dv.querySelector('.modal.vod .vod-aide a');
+      check('fiche : la fenêtre vidéo garde une porte de sortie vers la source',
+        !!dv.querySelector('.modal.vod .close') && !!porte && /youtube\.com\/watch/.test(porte.getAttribute('href')));
+      check('fiche : on commande le cadre par messages, sans charger leur bibliothèque',
+        /enablejsapi=1/.test(srcCadre) && new RegExp('origin=' + encodeURIComponent(dv.location.origin)).test(srcCadre), srcCadre.slice(-70));
+      check('fiche : la peau de la boutique est posée sur le cadre, pas les contrôles YouTube',
+        !!dv.querySelector('.modal.vod [data-peau]') && !!dv.querySelector('[data-jouer]')
+        && !!dv.querySelector('[data-barre]') && !!dv.querySelector('[data-silence]'));
+      check('fiche : la sortie se range dans notre peau', !!dv.querySelector('.vod-peau .vod-lien'));
+      const carteFin = dv.querySelector('.modal.vod [data-fin]');
+      check('fiche : la carte de fin reste rangée tant que la vidéo court',
+        !!carteFin && carteFin.hidden === true);
+      const fenetreCadre = elCadre ? elCadre.contentWindow : null;
+      const envoyes = [];
+      if (fenetreCadre) fenetreCadre.postMessage = (msg, cible) => envoyes.push({ msg, cible });
+      const presse = (sel) => { const x = dv.querySelector(sel); if (x) x.dispatchEvent(new wv.MouseEvent('click', { bubbles: true })); };
+      presse('.vod-peau [data-silence]');
+      check('fiche : couper le son se dit au cadre en un message, sans leur script',
+        envoyes.some((e) => /"func":"mute"/.test(e.msg)), JSON.stringify(envoyes.map((e) => e.msg)).slice(0, 74));
+      check('fiche : le message ne part qu’au lecteur, pas à tout le monde',
+        envoyes.length > 0 && envoyes.every((e) => e.cible === 'https://www.youtube-nocookie.com'),
+        envoyes.length ? String(envoyes[0].cible) : 'aucun message parti');
+      presse('.vod-peau [data-jouer]');
+      check('fiche : notre bouton à nous lit et met en pause',
+        envoyes.some((e) => /"(play|pause)Video"/.test(e.msg)));
+      const avantPeau = envoyes.length;
+      presse('.vod-peau');
+      check('fiche : toucher l’image suffit à reprendre la main sur la lecture', envoyes.length > avantPeau);
+      const dit = (obj) => {
+        /* un message du cadre arrive sur la FENÊTRE, pas sur le document : c'est là qu'on l'écoute */
+        if (fenetreCadre) wv.dispatchEvent(new wv.MessageEvent('message', { data: JSON.stringify(obj), source: fenetreCadre }));
+      };
+      dit({ event: 'infoDelivery', id: 'fatoucha', info: { currentTime: { currentTime: 5 }, duration: { duration: 10 }, playerState: { playerState: 1 } } });
+      await wait(30);
+      const jauge = dv.querySelector('[data-progression]');
+      check('fiche : la progression se lit sur notre filet à nous',
+        !!jauge && /^50(\.0+)?%$/.test(jauge.style.width) && dv.querySelector('.modal.vod').classList.contains('lit'),
+        jauge ? jauge.style.width : 'sans jauge');
+      dit({ event: 'infoDelivery', id: 'fatoucha', info: { currentTime: { currentTime: 9.7 }, duration: { duration: 10 }, playerState: { playerState: 1 } } });
+      await wait(30);
+      check('fiche : une demi-seconde avant la fin, c’est la boutique qui reprend la main',
+        !!carteFin && carteFin.hidden === false && envoyes.some((e) => /"func":"pauseVideo"/.test(e.msg)),
+        carteFin ? 'carte cachée' : 'aucune carte');
+      check('fiche : la carte de fin porte l’article, son prix et le panier',
+        !!dv.querySelector('.vod-fin-titre') && /\d/.test(dv.querySelector('.vod-fin-prix').textContent)
+        && !!dv.querySelector('.vod-fin [data-suite]') && !!dv.querySelector('.vod-fin-lien'),
+        dv.querySelector('.vod-fin-prix') ? dv.querySelector('.vod-fin-prix').textContent.trim() : 'sans carte');
+      check('fenêtre vidéo : rien de YouTube n’exécute dans la page',
+        !/youtube\.com\/(iframe_api|www-widgetapi)/.test(dv.documentElement.innerHTML));
       const cadreEl = dv.querySelector('.modal.vod iframe');
       if (cadreEl) cadreEl.remove();
       dv.dispatchEvent(new wv.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
       await wait(120);
       check('fiche : Échap referme la vidéo', !dv.querySelector('.modal.vod'));
+      /* Sur un lecteur qu'on ne peut pas commander (TikTok, Instagram), on ne
+         couvre pas ce qu'on ne peut pas piloter : leurs boutons restent
+         joignables, notre peau reste rangée, la sortie revient dessous. */
+      wv.eval("ouvrirVideo({ id: 900, titre: 'Essai TikTok', prix: 5000, stock: 1, video: { fournisseur: 'tiktok', etiquette: 'TikTok', page: 'https://www.tiktok.com/@fatoucha/video/1', cadre: 'https://www.tiktok.com/@fatoucha/video/1/embed', format: 'vertical', miniature: null } })");
+      await wait(60);
+      const modalTT = dv.querySelector('.modal.vod');
+      check('lecteur non pilotable : aucune peau posée sur son cadre', !!modalTT && !modalTT.querySelector('[data-peau]'));
+      check('lecteur non pilotable : la sortie reste sous le cadre', !!modalTT && !!modalTT.querySelector('.vod-aide a[href*="tiktok"]'));
+      if (modalTT) { const x = modalTT.querySelector('[data-x]'); if (x) x.dispatchEvent(new wv.MouseEvent('click', { bubbles: true })); }
+      await wait(40);
+      check('lecteur non pilotable : il se referme de la même main', !dv.querySelector('.modal.vod'));
       check('fenêtre vidéo : aucune erreur dans nos propres scripts', bruitVod.length === 0, bruitVod.slice(0, 2).join(' | '));
       wv.eval('window.Mesure && Mesure.vider()');
       await wait(120);

@@ -430,6 +430,18 @@ const J = async (method, url, body, token) => {
     await J('PUT', '/api/admin/produits/' + p0.id, { video_url: 'https://youtu.be/dQw4w9WgXcQ?si=Kj2xYz' }, tok);
     const partage = (await J('GET', '/api/produits/' + p0.id)).data;
     check('et ce lien-là aboutit bien à un lecteur sur la fiche (pas une carte muette)', partage.video && /\/embed\/dQw4w9WgXcQ\?/.test(partage.video.cadre || ''), partage.video && partage.video.cadre);
+    /* l'habillage du lecteur : ce qui doit manquer à l'écran est demandé ici, en
+       réglages officiels du lecteur — pas un cache posé sur leur marque */
+    const reglagesCadre = (partage.video && partage.video.cadre || '').split('?')[1] || '';
+    check('le lecteur arrive sans leurs habits (barre, titre, cartes, suggestions, plein écran)',
+      ['controls=0', 'rel=0', 'cc_load_policy=0', 'fs=0', 'disablekb=1', 'playsinline=1']
+        .every((p) => reglagesCadre.indexOf(p) >= 0)
+      /* et rien qui ne sert à rien : les deux réglages abrogés par YouTube sont hors du lien */
+      && ['modestbranding', 'iv_load_policy', 'showinfo'].every((mort) => reglagesCadre.indexOf(mort) < 0),
+      reglagesCadre.slice(0, 110));
+    const vimeoCadre = require('../server/videos').analyser('https://vimeo.com/76979871').cadre || '';
+    check('chez Vimeo on coupe la même chose (titre, byline, portrait)',
+      /title=0/.test(vimeoCadre) && /byline=0/.test(vimeoCadre) && /portrait=0/.test(vimeoCadre), vimeoCadre);
     await J('PUT', '/api/admin/produits/' + p0.id, { video_url: '' }, tok);
     /* un Short se range en portrait ou ne se range pas : l'image 16:9 de YouTube
        entoure la vidéo de deux bandes noires et sur une carte de 42 px, ça fait

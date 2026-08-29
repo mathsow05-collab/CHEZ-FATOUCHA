@@ -23,6 +23,8 @@ const YOUTUBE_ID = '[A-Za-z0-9_-]{11}';
    `miniature` = une image publique du fournisseur (on la rapatrie chez nous à
    l'enregistrement, pour ne pas dépendre d'un tiers à chaque affichage) ;
    `format` = le ratio du cadre, pour ne pas écraser une vidéo verticale. */
+const REGLAGES_YT = 'rel=0&playsinline=1&controls=0&fs=0&cc_load_policy=0&disablekb=1';
+
 const FOURNISSEURS = [
   {
     nom: 'youtube',
@@ -38,7 +40,26 @@ const FOURNISSEURS = [
     },
     hotes: /^(www\.)?(youtube\.com|youtu\.be|m\.youtube\.com)$/,
     page: (id) => `https://www.youtube.com/watch?v=${id}`,
-    cadre: (id) => `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1`,
+    /* Le lecteur est habillé par la boutique. La liste ci-dessous ne retient que
+       ce que YouTube honore encore, paramètre par paramètre :
+         controls=0         leur barre disparaît : progression, rouage « qualité »,
+                            « regarder plus tard », la ligne du titre et le texte
+                            « Watch on YouTube » — c'est le seul qui change l'écran
+         fs=0               pas de bouton plein écran, qui ouvrirait chez eux
+         disablekb=1        les flèches du clavier restent à la boutique
+         cc_load_policy=0   pas de sous-titres automatiques dessinés par eux
+         playsinline=1      sur iPhone, la vidéo ne bascule pas dans l'app YouTube
+         rel=0              depuis 2018, cela ne SUPPRIME plus les suggestions de
+                            fin : cela les borne à la chaîne qui a publié la vidéo.
+                            C'est pour ça que la boutique met la pause avant leur
+                            écran de fin (public/js/app.js) plutôt que de le subir.
+       Deux réglages qu'on trouvait partout ont été retirés, et pour cause :
+       modestbranding est abrogé depuis le 15 août 2023 (« has no effect », dit la
+       référence) et iv_load_policy visait les annotations, supprimées en 2019.
+       Leur marque, on ne la recouvre pas : cela est écrit dans leurs conditions
+       et ils pourraient fermer l'intégration des vidéos de la boutique. Ce qu'on
+       peut faire, et qu'on fait, c'est ne pas la rendre cliquable. */
+    cadre: (id) => `https://www.youtube-nocookie.com/embed/${id}?` + REGLAGES_YT,
     /* `hqdefault` existe toujours mais cadre le Short dans 480×360 avec deux
        barres noires ; `oardefault` est l'image au format d'origine (1080×1920,
        sans barres) mais YouTube répond parfois 404 — avec une vignette grise
@@ -54,7 +75,7 @@ const FOURNISSEURS = [
     id: (u) => /^\/video\/(\d+)/.exec(u.pathname)?.[1] || /^\/(\d+)$/.exec(u.pathname)?.[1] || null,
     hotes: /^(www\.|player\.)?vimeo\.com$/,
     page: (id) => `https://vimeo.com/${id}`,
-    cadre: (id) => `https://player.vimeo.com/video/${id}`,
+    cadre: (id) => `https://player.vimeo.com/video/${id}?title=0&byline=0&portrait=0&dnt=1&pip=false`,
     miniature: null,
     format: () => 'paysage',
     etiquette: 'Vimeo',
