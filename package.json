@@ -15,7 +15,8 @@
     "demo:images": "node scripts/make-demo-images.js",
     "check:css": "node scripts/check-css.js",
     "build": "node scripts/check-css.js && node scripts/prepare-images.js",
-    "images:prepare": "node scripts/prepare-images.js"
+    "images:prepare": "node scripts/prepare-images.js",
+    "admin:reset": "node scripts/reset-admin.js"
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",

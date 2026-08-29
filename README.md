@@ -262,6 +262,54 @@ photos fixes. Si tu déposes le fichier ici, souviens-toi que le disque de
 l'instance gratuite est remis à zéro à chaque redéploiement : le lien YouTube,
 lui, ne saute pas.
 
+### Le faire sur le site en ligne, pas à pas
+
+1. Ouvrir `https://chez-fatoucha.onrender.com/admin` — l'adresse n'apparaît
+   nulle part sur la boutique, il faut la taper (aucun lien pour que les clientes
+   ne tombent jamais dessus).
+2. Se connecter avec `ADMIN1_USERNAME` / `ADMIN1_PASSWORD` tels qu'ils sont dans
+   Render → ton service → **Environment**. Ce sont eux qui ont servi au premier
+   lancement ; il n'y a pas de « mot de passe oublié » sur la page.
+3. Onglet **Produits** → le crayon sur l'article → champ **Vidéo de la fiche** →
+   coller le lien → **Enregistrer**. Le bandeau sous le champ dit ce qui a été
+   reconnu : « YouTube · format paysage (16:9) · lecteur intégré au toucher »,
+   « format vertical (9:16) » pour un Short, ou « lien externe · la fiche mettra
+   un bouton qui ouvre la vidéo chez le fournisseur » si le lien n'est pas
+   intégrable — dans ce cas rien n'est perdu, le lien reste en base.
+4. Recharger la fiche côté boutique (une fois suffit : le code est resservi depuis
+   le réseau depuis que le service worker ne le met plus en cache prioritaire).
+
+### Les liens qui marchent
+
+`youtube.com/watch?v=…`, `youtu.be/…?si=…` (le lien que le bouton « Partager »
+d'un téléphone fabrique), `youtube.com/shorts/…`, `youtube.com/embed/…`,
+`youtube.com/live/…`, `vimeo.com/…`, `tiktok.com/@compte/video/…`,
+`instagram.com/reel/…`. Les liens courts nés du même bouton (« Partager ») —
+`vm.tiktok.com/…`, `vt.tiktok.com/…`, `bit.ly/…`, `t.co/…` — sont acceptés : le
+site les déroule et, s'il trouve l'adresse complète, **remplace ce que tu as
+collé par cette adresse** dans le formulaire. C'est elle qui est stable ; le
+raccourci, lui, peut changer de destination.
+
+Un lien WhatsApp, Facebook ou un fichier qui n'est pas sur le site reste refusé
+à dessein : la fiche d'une cliente ne charge rien en dehors des lecteurs listés.
+
+### Plus le mot de passe de l'espace vendeur
+
+`ADMIN1_PASSWORD` ne sert qu'à la **création** du compte : le changer dans Render
+ne remet pas le mot de passe à plat d'un compte qui existe déjà. Depuis le
+**Shell** du service (Render → ton service → Shell), qui voit la même base que la
+boutique :
+
+```bash
+npm run admin:reset -- --user=admin --pass='un mot de passe solide'
+# pour qu'un mot de passe soit inventé et affiché une seule fois :
+npm run admin:reset -- --user=admin --genere
+npm run admin:reset -- --aide
+```
+
+Le compte est créé s'il n'existe pas (première base, ou disque remis à zéro).
+Une fois entré, le mot de passe se change aussi de l'intérieur : **Réglages → Sécurité**.
+
 ## Images : pourquoi les vignettes sont pré-cuites au build
 
 Les photos du site ne sont pas servies telles quelles : chaque visuel existe en

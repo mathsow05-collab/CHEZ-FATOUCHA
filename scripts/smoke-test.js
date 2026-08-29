@@ -467,6 +467,10 @@ const J = async (method, url, body, token) => {
     const vide = (await J('GET', '/api/produits/' + p0.id)).data;
     check('vider le champ enlève tout bloc vidéo de la fiche', vide.video === null && !/vod-cart/.test(await (await fetch(BASE + '/produit/' + (avecVideo.slug || p0.id))).text()), JSON.stringify(vide.video));
 
+    const aideReset = require('child_process').spawnSync(process.execPath, [path.join(__dirname, '..', 'scripts', 'reset-admin.js')], { encoding: 'utf8', env: { ...process.env, ADMIN1_PASSWORD: '' } });
+    check('sans mot de passe, admin:reset refuse et n’écrit rien', aideReset.status === 2 && /Rien n’a été changé/.test(aideReset.stderr) && !/Error/.test(aideReset.stderr), 'code ' + aideReset.status);
+    check('admin:reset est branché dans npm', /"admin:reset":\s*"node scripts\/reset-admin\.js"/.test(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')));
+
     console.log('— Avis clientes : envoi, modération, réputation —');
     const sansAvis = (await J('GET', '/api/produits/' + p0.id)).data;
     check('note moyenne renvoyée avec le produit', sansAvis.avis && typeof sansAvis.avis.nombre === 'number', JSON.stringify(sansAvis.avis));
