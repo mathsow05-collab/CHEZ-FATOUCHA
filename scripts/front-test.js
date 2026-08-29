@@ -306,6 +306,54 @@ const J = async (method, url, body, token) => {
     }
 
     /* --- espace vendeur : page séparée /admin, ouverte dans sa propre fenêtre --- */
+    /* ---------- la rubrique Shorts, vue par le navigateur ----------
+       Deux blessures connues, toutes les deux invisibles dans le HTML servi :
+       le rail effacé par l'hydratation, et le routeur qui remet l'accueil à la
+       place d'une page rendue par le serveur. Fenêtre isolée ici aussi. */
+    await J('PUT', '/api/admin/produits/1', { video_url: 'https://www.youtube.com/shorts/dQw4w9WgXcQ', video_miniature: '' }, jetonAdmin);
+    const vcCourt = new VirtualConsole();
+    const bruitCourt = [];
+    const garderCourt = (e) => { const t = (e && e.stack) || String(e); if (nosFichiers(t)) bruitCourt.push(t.split('\n')[0].trim()); };
+    vcCourt.on('jsdomError', garderCourt);
+    vcCourt.on('error', (...a) => { const t = a.join(' '); if (nosFichiers(t)) bruitCourt.push(t); });
+    const domAccueil = await JSDOM.fromURL(BASE + '/', { ...opts, virtualConsole: vcCourt, beforeParse: (window) => brancher(window, garderCourt) });
+    const wcA = domAccueil.window;
+    const dcA = wcA.document;
+    const dl = await JSDOM.fromURL(BASE + '/shorts', { ...opts, virtualConsole: vcCourt, beforeParse: (window) => brancher(window, garderCourt) });
+    const wd = dl.window;
+    const dd = wd.document;
+    try {
+      await until(() => typeof wcA.go === 'function' && typeof wd.go === 'function', { label: 'deux fenêtres hydratées' });
+      await wait(400);
+      check('accueil : le rail des Shorts survit à l’hydratation', !!dcA.getElementById('shorts') && dcA.querySelectorAll('.short-tuile').length >= 1,
+        `(${dcA.querySelectorAll('.short-tuile').length} tuile(s) après hydratation)`);
+      check('accueil : le menu a gardé l’entrée Shorts', /Shorts/.test((dcA.querySelector('.main') || da.body).textContent));
+      check('accueil : la tuile est un vrai lien (lisibles sans JavaScript)', !!dcA.querySelector('.short-tuile[href^="/produit/"]'));
+      check('/shorts : le routeur laisse la page du serveur en place (pas d’accueil par-dessus)',
+        /Shorts/.test((dd.querySelector('h1') || { textContent: 'aucun titre' }).textContent) && !!dd.querySelector('.shorts-grille'),
+        `h1 = ${(dd.querySelector('h1') || { textContent: '—' }).textContent.slice(0, 34)}`);
+      check('/shorts : aucun lecteur avant le toucher', dd.querySelectorAll('iframe').length === 0);
+      const tuile = dd.querySelector('.short-tuile');
+      if (tuile) { tuile.dispatchEvent(new wd.MouseEvent('click', { bubbles: true, cancelable: true })); }
+      await until(() => dd.querySelector('.modal.vod iframe'), { label: 'fenêtre vidéo ouverte depuis la tuile', tries: 40 });
+      const srcTuile = (dd.querySelector('.modal.vod iframe') || { getAttribute: () => 'aucun cadre' }).getAttribute('src');
+      check('/shorts : toucher une tuile ouvre le lecteur ici, en vertical',
+        /youtube-nocookie\.com\/embed\//.test(srcTuile) && /autoplay=1/.test(srcTuile) && /class="vod-cadre vertical"/.test(dd.querySelector('.modal.vod').innerHTML),
+        srcTuile.slice(0, 64));
+      check('/shorts : la tuile ne fait pas ouvrir un onglet en plus', dd.querySelectorAll('.modal.vod').length === 1);
+      await wait(150);
+      check('rubrique Shorts : aucune erreur dans nos propres scripts', bruitCourt.length === 0, bruitCourt.slice(0, 2).join(' | '));
+      wcA.eval('window.Mesure && Mesure.vider()');
+      wd.eval('window.Mesure && Mesure.vider()');
+      await wait(120);
+    } finally {
+      await J('PUT', '/api/admin/produits/1', { video_url: '', video_miniature: '' }, jetonAdmin);
+      wcA.eval('window.Mesure && Mesure.vider()');
+      await wait(60);
+      domAccueil.window.close();
+      dl.window.close();
+    }
+
     domAdm = await JSDOM.fromURL(BASE + '/admin#produits', { ...opts, beforeParse: (window) => { brancher(window); window.localStorage.setItem('fatoucha_admin_token', jetonAdmin); } });
     const wa = domAdm.window;
     const da = wa.document;

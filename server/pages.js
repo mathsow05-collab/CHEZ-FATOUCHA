@@ -32,7 +32,7 @@ const jplural = (n) => (Number(n) > 1 ? 'jours' : 'jour');
 
 /* ---------------- morceaux communs ---------------- */
 function entete(cfg, actif = '', options = {}) {
-  const { menu = true } = options;
+  const { menu = true, courts = 0 } = options;
   const nom = cfg.nom_boutique || 'CHEZ FATOUCHA';
   const wa = String(cfg.whatsapp || cfg.telephone || '').replace(/\D/g, '');
   const mono = nom.replace(/[^\p{L}\s]/gu, ' ').split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]).join('').toUpperCase();
@@ -43,6 +43,7 @@ function entete(cfg, actif = '', options = {}) {
     </a>
     <nav class="main" aria-label="Navigation principale">
       <a href="/boutique" class="${actif === 'boutique' ? 'on' : ''}">Boutique</a>
+      ${courts ? `<a href="/shorts" class="${actif === 'shorts' ? 'on' : ''}">Shorts</a>` : ''}
       <a href="/suivi" class="${actif === 'suivi' ? 'on' : ''}">Suivre ma commande</a>
       <a href="/faq" class="${actif === 'faq' ? 'on' : ''}">Questions fréquentes</a>
     </nav>
@@ -55,6 +56,7 @@ function entete(cfg, actif = '', options = {}) {
   <nav class="tiroir" id="tiroir" aria-label="Menu">
     <div class="tete"><b>${ech(nom)}</b><button class="close" data-tiroir-x aria-label="Fermer le menu">${icone('croix')}</button></div>
     <a href="/boutique"${actif === 'boutique' ? ' aria-current="page"' : ''}>Boutique${icone('fleche', { taille: 16 })}</a>
+    ${courts ? `<a href="/shorts"${actif === 'shorts' ? ' aria-current="page"' : ''}>Shorts (${courts})${icone('lecture', { taille: 16 })}</a>` : ''}
     <a href="/suivi"${actif === 'suivi' ? ' aria-current="page"' : ''}>Suivre ma commande${icone('colis', { taille: 16 })}</a>
     <a href="/faq"${actif === 'faq' ? ' aria-current="page"' : ''}>Questions fréquentes${icone('discuter', { taille: 16 })}</a>
     <a href="/panier">Panier${icone('panier', { taille: 16 })}</a>
@@ -159,9 +161,85 @@ function blocVideo(p, images) {
   </a>`;
 }
 
+/* ------------------------------------------------------------------------
+   Les Shorts — une vidéo verticale ne se range pas comme une photo.
+   Un article qui a un lien vertical (YouTube Shorts, TikTok, Reel) entre
+   dans la rubrique : le rail de l'accueil, la page /shorts, l'entrée du menu.
+   Un seul endroit la cherche, pour que les trois soient d'accord.
+   ------------------------------------------------------------------------ */
+function videosCourtes({ limite = 0 } = {}) {
+  const tous = listerProduits({ limit: 0 }).map(produitPublic);
+  const courtes = tous.filter((x) => x.video && x.video.format === 'vertical');
+  return limite ? courtes.slice(0, limite) : courtes;
+}
+
+/* La tuile se suffit à elle-même sans JavaScript : elle mène à la fiche.
+   Le geste qui veut la lire ici est ajouté côté cliente (data-short). */
+function tuileCourte(p) {
+  const lien = p.url || `/produit/${p.id}`;
+  const visuel = p.video.miniature || p.image || '/media/demo/robe-boheme.svg';
+  return `<a class="short-tuile" href="${ech(lien)}" data-short="${p.id}" aria-label="Regarder le Short de ${ech(p.titre)} — ${ech(p.video.etiquette || '')}">
+    <span class="short-visuel">${optima.baliseImage(visuel, p.titre, { largeurs: [220, 480], sizes: '(max-width:640px) 44vw, 210px' })}</span>
+    <span class="short-sceau" aria-hidden="true">${icone('lecture', { taille: 17 })}</span>
+    <span class="short-legende"><b>${ech(p.titre)}</b><i>${fcfa(p.prix)} · ${ech(p.video.etiquette || 'vidéo')} · ${ech(p.categorie || 'boutique')}</i></span>
+  </a>`;
+}
+
+function rubriqueCourts(liste) {
+  if (!liste.length) return '';
+  return `<section class="blk rang shorts" id="shorts"><div class="wrap">
+    <div class="blk-head"><div><span class="sur">Vu en vidéo</span><h2>Shorts de la boutique</h2>
+      <p>Trois secondes de tissu qui bouge disent plus que trois photos fixes. Touche un Short pour le lire ici même.</p></div>
+      <a class="link" href="/shorts">Tous les Shorts ${icone('fleche', { taille: 14 })}</a></div>
+    <div class="short-rail">${liste.map((x) => tuileCourte(x)).join('')}</div>
+  </div></section>`;
+}
+
+function pageCourts(req) {
+  const cfg = reglages(req);
+  const liste = videosCourtes();
+  const nom = cfg.nom_boutique || 'CHEZ FATOUCHA';
+  const premier = liste[0];
+  const corps = `
+  ${entete(cfg, 'shorts', { courts: liste.length })}
+  <section class="blk"><div class="wrap">
+    <div class="blk-head"><div><span class="sur">${liste.length ? liste.length + ' vidéo(s) verticale(s)' : 'rien à montrer pour l’instant'}</span>
+      <h1>Shorts de la boutique</h1>
+      <p>${liste.length
+        ? 'Les pièces filmées par la boutique, au format téléphone : le tissu bouge, la couture se voit, la taille se comprend. Aucun son ne démarre tout seul.'
+        : 'La boutique n’a pas encore mis de vidéo verticale sur ses articles. Chaque fiche peut en recevoir une : le lien d’un Short YouTube, d’un Reel ou d’un TikTok, collé dans l’espace vendeur.'}</p></div></div>
+    ${liste.length ? `<div class="shorts-grille">${liste.map((x) => tuileCourte(x)).join('')}</div>
+      <p class="small muted">La lecture vient de ${ech((premier.video && premier.video.etiquette) || 'YouTube')} : ça compte sur ton forfait — rien ne se lance tout seul.</p>
+      <div class="rang-pied"><a class="btn ghost" href="/boutique">Voir tout le catalogue ${icone('fleche', { taille: 15 })}</a></div>`
+      : `<div class="bloc empty"><div class="big">${icone('lecture', { taille: 28 })}</div><b>Aucun Short pour l’instant.</b><br><a class="btn gold" href="/boutique">Voir la boutique ${icone('fleche', { taille: 15 })}</a></div>`}
+  </div></section>
+  ${pied(cfg)}`;
+  const fil = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Accueil', item: baseAbsolue(req) + '/' },
+    { '@type': 'ListItem', position: 2, name: 'Shorts', item: baseAbsolue(req) + '/shorts' },
+  ] };
+  const listeSchema = liste.length ? {
+    '@context': 'https://schema.org', '@type': 'ItemList',
+    numberOfItems: liste.length,
+    itemListElement: liste.map((x, i) => ({ '@type': 'ListItem', position: i + 1, url: baseAbsolue(req) + (x.url || `/produit/${x.id}`), name: x.titre })),
+  } : null;
+  return pageHTML({
+    cfg,
+    titre: `Shorts — la boutique en vidéo · ${nom}`,
+    description: liste.length
+      ? `Les vidéos verticales de ${nom} à Dakar : ${liste.slice(0, 3).map((x) => x.titre).join(', ')}…`
+      : `Les vidéos verticales de ${nom}, bientôt.`,
+    url: baseAbsolue(req) + '/shorts',
+    image: premier && premier.video && premier.video.miniature ? premier.video.miniature : '/media/demo/lookbook.jpg',
+    jsonLd: listeSchema ? [fil, listeSchema] : [fil],
+    corps,
+  });
+}
+
 function accueil(req) {
   const cfg = reglages(req);
   const recents = listerProduits({ limit: 12 }).map(produitPublic);
+  const courtsAccueil = videosCourtes({ limite: 10 });
   const vedettes = db
     .prepare('SELECT p.*, c.name AS categorie_nom FROM produits p LEFT JOIN categories c ON c.id = p.categorie_id WHERE p.actif = 1 AND p.vedette = 1 ORDER BY p.id DESC LIMIT 6')
     .all()
@@ -175,7 +253,7 @@ function accueil(req) {
   const noteGlobale = db.prepare('SELECT COUNT(*) AS n, AVG(note) AS m FROM avis WHERE approuve = 1').get();
 
   const corps = `
-  ${entete(cfg, 'boutique')}
+  ${entete(cfg, 'boutique', { courts: courtsAccueil.length })}
   <section class="hero"><div class="wrap"><div class="inner spot">
     <div class="txt">
       <span class="sur shiny">Sélection &amp; pièces choisies · Dakar</span>
@@ -203,6 +281,7 @@ function accueil(req) {
     ${cats.map((c) => `<a class="cat" href="/categorie/${ech(c.slug || c.id)}">${puce(c.emoji)}${ech(c.name)} <span class="n">${c.n}</span></a>`).join('')}
   </div></div></section>
 
+  ${rubriqueCourts(courtsAccueil)}
   ${rangee('Sélection de Fatou', 'Les pièces qu’elle met en avant cette semaine.', vedettes.length ? vedettes : recents.slice(0, 6))}
 
   <section class="blk" id="boutique-grid"><div class="wrap">
@@ -692,6 +771,7 @@ function sitemap(base) {
     lignes.push(`  <url><loc>${ech(url(p))}</loc><lastmod>${modif || maintenant}</lastmod><changefreq>${freq}</changefreq><priority>${priorite}</priority></url>`);
   entree('/', '1.0', 'daily');
   entree('/boutique', '0.9', 'daily');
+  if (videosCourtes({ limite: 1 }).length) entree('/shorts', '0.8', 'weekly');
   entree('/faq', '0.5', 'monthly');
   entree('/retours', '0.5', 'monthly');
   for (const c of db.prepare('SELECT slug, id FROM categories ORDER BY ordre').all()) entree(`/categorie/${c.slug || c.id}`, '0.7', 'weekly');
@@ -715,4 +795,4 @@ function robots(base) {
   ].filter((l, i, a) => l !== '' || i === a.length - 1).join('\n');
 }
 
-module.exports = { blocVideo, accueil, boutique, categorie, produit, pageContenu, confirmation, pageHTML, sitemap, robots, faqDepuisMarkdown, ech, fcfa, reglages, baseAbsolue };
+module.exports = { blocVideo, accueil, boutique, pageCourts, videosCourtes, rubriqueCourts, categorie, produit, pageContenu, confirmation, pageHTML, sitemap, robots, faqDepuisMarkdown, ech, fcfa, reglages, baseAbsolue };

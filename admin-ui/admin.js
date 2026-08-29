@@ -211,6 +211,11 @@ async function vueProduits(body) {
         const avec = rows.filter((r) => r.video);
         const vertical = avec.filter((r) => r.video.format === 'vertical').length;
         const mots = (n) => n + (n > 1 ? ' articles' : ' article');
+        if (S.produits.etat === 'shorts') {
+          return avec.length
+            ? `<b>${mots(avec.length)} avec un Short (portrait)</b> — la rubrique « Shorts » de l’accueil en montre ${avec.length}.`
+            : `<span class="tag nouvelle">aucun Short enregistré</span> — un lien <span class="mono">youtube.com/shorts/…</span> collé dans une fiche la fait entrer ici et sur l’accueil.`;
+        }
         return avec.length
           ? `<b>${mots(avec.length)} sur ${rows.length} ont une vidéo</b>${vertical ? `, dont ${vertical} en Short (portrait)` : ''}.`
           : `<span class="tag nouvelle">aucune vidéo enregistrée</span> sur ${rows.length} articles — tant que le champ n’est pas rempli dans l’article, la fiche n’a rien à afficher.`;
@@ -219,6 +224,7 @@ async function vueProduits(body) {
       <button class="btn sm ghost" data-filtre="tous" ${S.produits.etat === 'tous' ? 'style="border-color:var(--ink)"' : ''}>Tous</button>
       <button class="btn sm ghost" data-filtre="actifs" ${S.produits.etat === 'actifs' ? 'style="border-color:var(--ink)"' : ''}>En ligne</button>
       <button class="btn sm ghost" data-filtre="rupture" ${S.produits.etat === 'rupture' ? 'style="border-color:var(--ink)"' : ''}>Rupture</button>
+      <button class="btn sm ghost" data-filtre="shorts" ${S.produits.etat === 'shorts' ? 'style="border-color:var(--ink)"' : ''}>Avec Short</button>
       <button class="btn sm ghost" data-filtre="inactifs" ${S.produits.etat === 'inactifs' ? 'style="border-color:var(--ink)"' : ''}>Masqués</button>
       <input id="p-q" class="inp" style="height:34px;width:170px" placeholder="rechercher un article…" value="${esc(S.produits.q)}" />
       <button class="btn gold" data-new>${icone('plus', { taille: 14 })} Nouvel article</button>
@@ -314,7 +320,7 @@ async function formProduit(p) {
     <div class="bloc" style="background:#fff">
       <h3>Vidéo &amp; réassurance <span class="small muted" style="font-weight:400;text-transform:none;letter-spacing:0">— ce qui fait acheter en ligne</span></h3>
       <div class="mini-form">
-        <div class="field full"><label>Vidéo de la pièce (lien YouTube, ou MP4 déposé ici)</label>
+        <div class="field full"><label>Vidéo de la pièce — YouTube, <b>Short vertical</b>, TikTok, Vimeo, ou MP4 déposé ici</label>
           <div class="row" style="gap:8px">
             <input class="inp" id="f-video" value="${esc(data.video_url || '')}" placeholder="https://www.youtube.com/watch?v=…  ·  /uploads/produits/… .mp4" />
             <button class="btn sm ghost" id="f-topvideo" type="button">Téléverser</button>

@@ -485,6 +485,34 @@ const J = async (method, url, body, token) => {
     const vide = (await J('GET', '/api/produits/' + p0.id)).data;
     check('vider le champ enlève tout bloc vidéo de la fiche', vide.video === null && !/vod-cart/.test(await (await fetch(BASE + '/produit/' + (avecVideo.slug || p0.id))).text()), JSON.stringify(vide.video));
 
+    /* ---------- la rubrique Shorts, et la politique qui autorise le lecteur ---------- */
+    const entetesAccueil = await fetch(BASE + '/');
+    const csp = entetesAccueil.headers.get('content-security-policy') || '';
+    const ligne = (d) => (csp.split(';').map((x) => x.trim()).find((x) => x.startsWith(d)) || '');
+    const { HOTES_CADRE } = require('../server/videos');
+    const fsCsp = ligne('frame-src');
+    check('la CSP autorise le cadre des lecteurs reconnus (sinon la fiche affiche un lecteur vide)',
+      !!fsCsp && HOTES_CADRE.every((h) => fsCsp.includes('https://' + h)) && !/\*/.test(fsCsp) && !/\shttps?:\s/.test(fsCsp), fsCsp.slice(0, 120) || 'AUCUNE directive frame-src');
+    check('default-src reste strict (le cadre n’ouvre pas le site à tout le monde)', /default-src 'self'/.test(csp), ligne('default-src'));
+    await J('PUT', '/api/admin/produits/' + p0.id, { video_url: 'https://www.youtube.com/shorts/dQw4w9WgXcQ', video_miniature: '' }, tok);
+    const accueilAvec = await (await fetch(BASE + '/')).text();
+    check('un article en Short fait apparaître la rubrique sur l’accueil', /id="shorts"[\s\S]*class="short-tuile"/.test(accueilAvec) && /data-short="/.test(accueilAvec));
+    check('le menu propose Shorts seulement quand il y a de quoi montrer', /href="\/shorts"/.test(accueilAvec));
+    check('la rubrique compte ses tuiles et ne place aucun lecteur d’avance',
+      (accueilAvec.match(/class="short-tuile"/g) || []).length >= 1 && !/<iframe/.test(accueilAvec));
+    const pageShorts = await fetch(BASE + '/shorts');
+    const htmlShorts = await pageShorts.text();
+    check('la page /shorts répond en 200, rendue par le serveur', pageShorts.status === 200 && /<h1>Shorts/.test(htmlShorts) && /class="shorts-grille"/.test(htmlShorts), 'HTTP ' + pageShorts.status);
+    check('la page /shorts porte le balisage de liste et aucun cadre', /"@type":"ItemList"/.test(htmlShorts) && /"@type":"BreadcrumbList"/.test(htmlShorts) && !/<iframe/.test(htmlShorts));
+    check('la page /shorts est au sitemap', /<loc>[^<]*\/shorts<\/loc>/.test(await (await fetch(BASE + '/sitemap.xml')).text()));
+    await J('PUT', '/api/admin/produits/' + p0.id, { video_url: '', video_miniature: '' }, tok);
+    const accueilSans = await (await fetch(BASE + '/')).text();
+    check('sans Short enregistré, la rubrique et le menu se retirent (pas de vitrine vide)',
+      !/id="shorts"/.test(accueilSans) && !/href="\/shorts"/.test(accueilSans));
+    const videShorts = await (await fetch(BASE + '/')).text();
+    const xmlSans = await (await fetch(BASE + '/sitemap.xml')).text();
+    check('et le sitemap retire la page vide', !/\/shorts<\/loc>/.test(xmlSans), (videShorts.match(/shorts/g) || []).length + ' occurrence(s)');
+
     const aideReset = require('child_process').spawnSync(process.execPath, [path.join(__dirname, '..', 'scripts', 'reset-admin.js')], { encoding: 'utf8', env: { ...process.env, ADMIN1_PASSWORD: '' } });
     check('sans mot de passe, admin:reset refuse et n’écrit rien', aideReset.status === 2 && /Rien n’a été changé/.test(aideReset.stderr) && !/Error/.test(aideReset.stderr), 'code ' + aideReset.status);
     check('admin:reset est branché dans npm', /"admin:reset":\s*"node scripts\/reset-admin\.js"/.test(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')));

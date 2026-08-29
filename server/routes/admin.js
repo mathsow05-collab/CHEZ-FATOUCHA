@@ -138,8 +138,7 @@ router.get('/produits', (req, res) => {
     `SELECT COALESCE(SUM(l.quantite), 0) AS n FROM commande_lignes l JOIN commandes c ON c.id = l.commande_id
       WHERE l.produit_id = ? AND c.statut IN (${STOCK_STATUTS_ACTIFS.map(() => '?').join(',')})`
   );
-  res.json(
-    rows.map((r) => ({
+  const lignes = rows.map((r) => ({
       ...produitPublic(r),
       actif: !!r.actif,
       /* trois champs que la boutique garde pour elle : prix d'achat, lien du
@@ -153,8 +152,11 @@ router.get('/produits', (req, res) => {
       video_miniature: r.video_miniature || '',
       updated_at: r.updated_at,
       reserve: qReserve.get(r.id, ...STOCK_STATUTS_ACTIFS).n,
-    }))
-  );
+  }));
+  /* « Avec Short » ne peut pas se trier en SQL : c'est le lien collé qui dit si la
+     vidéo est verticale ou paysage. On filtre donc après coup, une fois la
+     reconnaissance passée. */
+  res.json(etat === 'shorts' ? lignes.filter((l) => l.video && l.video.format === 'vertical') : lignes);
 });
 
 /* Vidéo de fiche : fichier téléversé sur le site, ou lien externe (TikTok/

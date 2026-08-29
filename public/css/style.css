@@ -696,6 +696,33 @@ h2, h3 { font-family: var(--serif); font-weight: 400; letter-spacing: -.006em }
 .vod-play { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ivoire);
   transition: transform .16s var(--eased) }
 .vod-cart:hover .vod-play { transform: scale(1.14) }
+
+/* ===== Les Shorts — le rail vertical =====
+   Une vidéo verticale ne se montre pas dans un cadre paysage : la tuile reprend
+   le ratio de l'image (9:16), la légende se pose sur un voile d'encre, et le
+   sceau de lecture reste dans le pouce. Rien ne se lit tout seul : la tuile est
+   un lien, le cadre n'existe qu'après le toucher. */
+.shorts .blk-head .link { white-space: nowrap; flex: 0 0 auto }
+.shorts .blk-head > div:first-child { min-width: 0 }
+.short-rail { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x proximity;
+  padding: 2px 0 12px; overscroll-behavior-x: contain; scrollbar-width: thin }
+.short-tuile { position: relative; flex: 0 0 auto; width: clamp(132px, 41vw, 170px); aspect-ratio: 9 / 16;
+  border: 1px solid var(--line); border-radius: 2px; overflow: hidden; background: var(--encre);
+  color: var(--ivoire); text-decoration: none; scroll-snap-align: start; display: block;
+  transition: transform .18s var(--eased), border-color .18s var(--eased) }
+.short-tuile:hover, .short-tuile:focus-visible { transform: translateY(-3px); border-color: var(--or) }
+.short-visuel { position: absolute; inset: 0; display: block }
+.short-visuel img { width: 100%; height: 100%; object-fit: cover; opacity: .94 }
+.short-sceau { position: absolute; top: 8px; right: 8px; width: 29px; height: 29px; display: grid; place-items: center;
+  border: 1px solid rgba(247, 243, 236, .46); border-radius: 50%; background: rgba(24, 17, 23, .44); color: var(--ivoire) }
+.short-tuile:hover .short-sceau { border-color: var(--or-clair); background: rgba(24, 17, 23, .62) }
+.short-legende { position: absolute; left: 0; right: 0; bottom: 0; padding: 30px 10px 9px; display: flex;
+  flex-direction: column; gap: 3px; background: linear-gradient(to top, rgba(20, 14, 19, .9), rgba(20, 14, 19, .34) 58%, transparent) }
+.short-legende b { font-family: var(--serif); font-size: 14px; font-weight: 400; line-height: 1.25 }
+.short-legende i { font-style: normal; font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase; opacity: .78 }
+.shorts-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(146px, 1fr)); gap: 12px; margin-top: 4px }
+.shorts-grille .short-tuile { width: auto }
+@media (min-width: 900px) { .short-tuile { width: 186px } }
 /* Un Short est une image 9:16 : dans une fenêtre 16:9, YouTube l'entoure de deux
    bandes noires et la robe disparaît. Sur la carte, on passe donc le sceau en
    portrait quand une miniature sans barres a pu être rangée ici. */

@@ -301,6 +301,16 @@ sur une carte de 42 px on ne voit plus l'article. Si YouTube ne fournit pas
 d'image portrait, aucune image n'est rangée : la carte garde le sceau de lecture
 sur fond d'encre, jamais les bandes noires ni la photo du produit.
 
+**Et la politique de sécurité, surtout.** Le site pose une
+`Content-Security-Policy` stricte (`default-src 'self'`). Sans directive
+`frame-src`, le navigateur **refuse le cadre** : la fiche affiche un lecteur
+vide, le HTML est correct, rien ne l'annonce — le seul endroit où ça se voit
+est la console. La directive est donc construite à partir de la **même liste**
+que celle qui autorise le cadre à l'enregistrement (`HOTES_CADRE` dans
+`server/videos.js`, exportée par `directiveCadre()`), et un contrôle du smoke
+test refuse tout écart (y compris un `frame-src *`, qui serait une ouverture
+inutile).
+
 Côté espace vendeur, la liste des articles le dit directement : « 2 articles sur
 8 ont une vidéo, dont 2 en Short (portrait) », et chaque ligne porte
 *Short · YouTube · miniature rangée* ou la mention discrète *sans vidéo* —

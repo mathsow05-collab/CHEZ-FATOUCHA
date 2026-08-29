@@ -33,6 +33,8 @@ app.use((req, res, next) => {
     'Content-Security-Policy',
     [
       "default-src 'self'",
+      /* les lecteurs vidéo intégrés (voir server/videos.js : même liste) */
+      require('./videos').directiveCadre(),
       "img-src 'self' data: blob: https: http:",
       "style-src 'self' 'unsafe-inline'",
       "script-src 'self'",
@@ -224,6 +226,19 @@ app.get('/categorie/:cle', (req, res, next) => {
     reponseHTML(res, SEO.categorie(req, c));
   } catch (e) {
     console.error('[ssr] catégorie :', e.message);
+    next();
+  }
+});
+
+/* Les Shorts : une vraie page rendue côté serveur (les liens verticaux doivent
+   être crawlables et la page doit s'afficher sans JavaScript), et une rubrique
+   sur l'accueil. Tant qu'aucun article n'a de vidéo verticale, le menu n'en
+   parle pas : mieux vaut une absence qu'une vitrine vide. */
+app.get('/shorts', (req, res, next) => {
+  try {
+    reponseHTML(res, SEO.pageCourts(req));
+  } catch (e) {
+    console.error('[ssr] shorts :', e.message);
     next();
   }
 });

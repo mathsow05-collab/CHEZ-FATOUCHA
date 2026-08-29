@@ -63,6 +63,7 @@ function topbar(active = '') {
       </a>
       <nav class="main" aria-label="Navigation principale">
         <a href="/boutique"${active === 'boutique' ? ' aria-current="page"' : ''} class="${active === 'boutique' ? 'on' : ''}" data-spa>Boutique</a>
+        ${courtsConnus ? `<a href="/shorts"${active === 'shorts' ? ' aria-current="page"' : ''} class="${active === 'shorts' ? 'on' : ''}">Shorts</a>` : ''}
         <a href="/favoris"${active === 'favoris' ? ' aria-current="page"' : ''} class="${active === 'favoris' ? 'on' : ''}" data-spa>Favoris</a>
         <a href="/suivi"${active === 'suivi' ? ' aria-current="page"' : ''} class="${active === 'suivi' ? 'on' : ''}" data-spa>Suivre ma commande</a>
         <a href="/faq"${active === 'faq' ? ' aria-current="page"' : ''} class="${active === 'faq' ? 'on' : ''}" data-spa>Aide</a>
@@ -78,6 +79,7 @@ function topbar(active = '') {
     <div class="tete"><b>${esc(Shop.cfg?.nom_boutique || 'CHEZ FATOUCHA')}</b>
       <button class="close" data-tiroir-x aria-label="Fermer le menu">${icone('croix')}</button></div>
     <a href="/boutique" data-spa>Boutique${icone('fleche', { taille: 16 })}</a>
+    ${courtsConnus ? `<a href="/shorts">Shorts (${courtsConnus})${icone('lecture', { taille: 16 })}</a>` : ''}
     <a href="/favoris" data-spa>Favoris${icone('coeur', { taille: 16 })}</a>
     <a href="/suivi" data-spa>Suivre ma commande${icone('colis', { taille: 16 })}</a>
     <a href="/faq" data-spa>Questions fréquentes${icone('discuter', { taille: 16 })}</a>
@@ -155,6 +157,34 @@ function card(p, options = {}) {
 
 /* Rangée horizontale (recommandations, sélection, favoris) : le carrousel
    tient sur un pouce, sans casser la mise en page du reste de la page. */
+/* La tuile d'un Short : le rendu serveur la fait, l'hydratation doit la refaire
+   à l'identique — sinon la rubrique apparaît puis disparaît sous les yeux. */
+/* Combien de Shorts le catalogue chargé contient : la barre de navigation ne
+   propose l'entrée que s'il y a de quoi la remplir. */
+let courtsConnus = 0;
+function marqueCourts(n) { courtsConnus = n; }
+
+function tuileCourte(p) {
+  const v = p.video || {};
+  const visuel = v.miniature || img(p);
+  return `<a class="short-tuile" href="${esc(lienProduit(p))}" data-short="${p.id}" aria-label="Regarder le Short de ${esc(p.titre)} — ${esc(v.etiquette || 'vidéo')}">
+    <span class="short-visuel">${baliseImg(visuel, p.titre, { largeurs: [220, 480], sizes: '(max-width:640px) 44vw, 210px' })}</span>
+    <span class="short-sceau" aria-hidden="true">${icone('lecture', { taille: 17 })}</span>
+    <span class="short-legende"><b>${esc(p.titre)}</b><i>${money(p.prix)} · ${esc(v.etiquette || 'vidéo')}${p.categorie ? ' · ' + esc(p.categorie) : ''}</i></span>
+  </a>`;
+}
+
+function rangCourts(produits) {
+  const courtes = produits.filter((x) => x.video && x.video.format === 'vertical').slice(0, 10);
+  if (!courtes.length) return '';
+  return `<section class="blk rang shorts" id="shorts"><div class="wrap">
+    <div class="blk-head"><div><span class="sur">Vu en vidéo</span><h2>Shorts de la boutique</h2>
+      <p>Trois secondes de tissu qui bouge disent plus que trois photos fixes. Touche un Short pour le lire ici même.</p></div>
+      <a class="link" href="/shorts">Tous les Shorts ${icone('fleche', { taille: 14 })}</a></div>
+    <div class="short-rail">${courtes.map((x) => tuileCourte(x)).join('')}</div>
+  </div></section>`;
+}
+
 function rangee(titre, sousTitre, produits, options = {}) {
   const { bouton = '', ancre = '', variante = '' } = options;
   if (!produits || !produits.length) return '';
@@ -268,8 +298,9 @@ async function vueBoutique({ accueil = true } = {}) {
     <p>${produits.length} article(s)${dispo !== produits.length ? ` · ${dispo} en stock` : ''} · prix en FCFA, livraison calculée au panier</p>
   </div></section>`;
 
+  marqueCourts(produits.filter((x) => x.video && x.video.format === 'vertical').length);
   return `
-  ${topbar('boutique')}
+  ${topbar(accueil ? 'boutique' : 'boutique')}
   ${tete}
   <section class="blk"><div class="wrap">
     <div class="cats" id="cats">
@@ -296,6 +327,7 @@ async function vueBoutique({ accueil = true } = {}) {
     </div>
   </div></section>` : ''}
 
+  ${accueil && !filtresActifs ? rangCourts(produits) : ''}
   ${accueil && vedettes.length && !filtresActifs ? rangee('Sélection de Fatou', 'Les pièces qu’elle met en avant cette semaine.', vedettes, { variante: 'selection' }) : ''}
   ${accueil && favs.length ? rangee('Tes favoris', 'Gardés sur cet appareil — touche le cœur sur une fiche pour les retirer.', favs.map((f) => ({ ...f, avis: null })), { variante: 'favoris', bouton: 'favoris' }) : ''}
 
@@ -937,6 +969,21 @@ async function render() {
   const path = routeCourante();
   const m = (re) => path.match(re);
 
+  /* Une page que le routeur ne dessine pas — /shorts, /confirmer/<ref>/<code>,
+     toute page ajoutée côté serveur — est LAISSÉE TELLE. Avant cette garde, le
+     routeur la remplaçait par l'accueil : la page s'affichait puis s'effaçait
+     sous les yeux, et « la rubrique n'apparaît pas » alors que le serveur
+     l'avait bien envoyée. On se contente d'y brancher les gestes globaux. */
+  if (!cheminDeSPA(path)) {
+    try {
+      await Shop.load();
+      Cart.renderBadge();
+      bind();
+      if (typeof Mouvement !== 'undefined') { try { Mouvement.appliquer(root); } catch (e) { /* rien */ } }
+    } catch (e) { /* une page lisible sans JavaScript le reste */ }
+    return;
+  }
+
   try {
     await Shop.load();
     lireFiltres();
@@ -962,7 +1009,7 @@ async function render() {
     else if (m(/^\/suivi/)) html = await vueSuivi();
     else if (m(/^\/favoris/)) html = await vueFavoris();
     else if (m(/^\/(faq|retours|livraison|a-propos)/)) html = await vueContenu(m(/^\/(faq|retours|livraison|a-propos)/)[1]);
-    else html = await vueBoutique();
+    else html = await vueBoutique(); /* route connue du routeur mais sans vue dédiée (garde ci-dessus) */
     /* dernier filtre : si un texte saisi dans le back-office contient un emoji,
        il ressort en tracé dessiné — la boutique garde une seule langue graphique */
     root.innerHTML = typeof sansPictos === 'function' ? sansPictos(html) : html;
@@ -1732,4 +1779,26 @@ document.addEventListener('keydown', (e) => {
   if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); openSearch(); }
   if (e.key === 'Escape') document.querySelectorAll('.modal').forEach((m) => m.remove());
 });
+/* Les tuiles des Shorts — sur l'accueil comme sur /shorts — ouvrent le même
+   lecteur que la fiche. Délégué sur le document et posé une seule fois : la
+  rubrique est redessinée à chaque changement de filtre, le geste survit.
+   Sans JavaScript, la tuile reste un lien vers l'article : rien ne se casse. */
+if (!document.__courtsPilotes) {
+  document.__courtsPilotes = true;
+  document.addEventListener('click', async (e) => {
+    const tuile = e.target.closest && e.target.closest('[data-short]');
+    if (!tuile || tuile.dataset.shortEncours) return;
+    e.preventDefault();
+    tuile.dataset.shortEncours = '1';
+    try {
+      const p = await (await fetch('/api/produits/' + encodeURIComponent(tuile.dataset.short))).json();
+      if (p && p.video && p.video.cadre) ouvrirVideo(p);
+      else location.href = tuile.getAttribute('href');
+    } catch {
+      location.href = tuile.getAttribute('href');
+    } finally {
+      delete tuile.dataset.shortEncours;
+    }
+  });
+}
 render();

@@ -7,7 +7,7 @@ const VERSION = 'fatoucha-v5';
 const MAX_IMG = 80;
 
 const JAMAIS = [/^\/api\/admin/, /^\/api\/commandes/, /^\/api\/paiement/, /^\/admin/, /\/(panier|commande|paiement)/];
-const RESEAU_DABORD = [/^\/$/, /^\/boutique/, /^\/produit\//, /^\/categorie\//, /^\/faq/, /^\/retours/, /^\/livraison/, /^\/a-propos/, /^\/api\/(config|produits|categories|zones|stats|pages)/,
+const RESEAU_DABORD = [/^\/$/, /^\/boutique/, /^\/shorts/, /^\/produit\//, /^\/categorie\//, /^\/faq/, /^\/retours/, /^\/livraison/, /^\/a-propos/, /^\/api\/(config|produits|categories|zones|stats|pages)/,
   /* le code et la feuille : le réseau d'abord, le cache en filet. Les garder en
      cache prioritaire, c'était se retrouver avec l'ancienne fiche après une
      mise à jour — une fiche qui « n'affiche pas la vidéo » alors qu'elle y est.

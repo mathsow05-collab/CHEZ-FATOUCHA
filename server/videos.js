@@ -201,15 +201,26 @@ function analyser(lien) {
 /* Une adresse de lecteur est-elle bien l'un des cadres qu'on autorise ?
    Utilisé à l'affichage : on ne met jamais dans un <iframe> une adresse qui
    n'aurait pas été fabriquée ici (lien détourné, ancien enregistrement…). */
+/* Les seuls hôtes dont la boutique accepte d'afficher le lecteur. Une seule
+   liste, lue deux fois : par `cadreAutorise` (à l'enregistrement) et par
+   l'en-tête Content-Security-Policy (au navigateur). Sans `frame-src`, le
+   navigateur applique `default-src 'self'` et refuse le cadre : la fiche
+   affiche un lecteur vide, sans rien dire dans le HTML — c'est le « la vidéo
+   ne vient pas » le plus tenace, et il ne se voit que dans la console. */
+const HOTES_CADRE = ['www.youtube-nocookie.com', 'player.vimeo.com', 'www.tiktok.com', 'www.instagram.com'];
+const TRAME_CADRE = new RegExp('^(?:' + HOTES_CADRE.map((h) => h.replace(/\./g, '\\.')).join('|') + ')$');
+
 function cadreAutorise(url) {
   const u = String(url || '');
   if (!/^https:\/\//.test(u)) return false;
   try {
-    const h = new URL(u).hostname;
-    return /^(www\.youtube-nocookie\.com|player\.vimeo\.com|www\.tiktok\.com|www\.instagram\.com)$/.test(h);
+    return TRAME_CADRE.test(new URL(u).hostname);
   } catch {
     return false;
   }
 }
 
-module.exports = { analyser, resoudre, estRaccourci, cadreAutorise, FOURNISSEURS, FOURNISSEUR_PAR_NOM };
+/** La directive CSP qui va avec la liste ci-dessus — jamais `frame-src *`. */
+const directiveCadre = () => 'frame-src ' + HOTES_CADRE.map((h) => 'https://' + h).join(' ');
+
+module.exports = { analyser, resoudre, estRaccourci, cadreAutorise, directiveCadre, HOTES_CADRE, FOURNISSEURS, FOURNISSEUR_PAR_NOM };

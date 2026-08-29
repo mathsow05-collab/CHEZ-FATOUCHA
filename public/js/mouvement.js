@@ -193,7 +193,8 @@
   /* ---------- 7. rails : les flèches + « on est arrivé au bout » ---------- */
   function rails(racine) {
     for (const rang of (racine || d).querySelectorAll('.rang')) {
-      const lignes = rang.querySelector('.rang-lignes');
+      /* les Shorts ont leur propre rail (tuiles 9:16) : mêmes flèches, même état « au bout » */
+      const lignes = rang.querySelector('.rang-lignes, .short-rail');
       if (!lignes || rang.__rail) continue;
       rang.__rail = true;
       const maj = () => {
