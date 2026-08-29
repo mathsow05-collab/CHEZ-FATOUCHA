@@ -291,6 +291,11 @@ const J = async (method, url, body, token) => {
       const cadreVod = dv.querySelector('.modal.vod iframe') || { getAttribute: () => 'aucun cadre' };
       const srcCadre = cadreVod.getAttribute('src');
       check('fiche : au toucher, le lecteur sans pistage démarre', /youtube-nocookie\.com\/embed\//.test(srcCadre) && /autoplay=1/.test(srcCadre), srcCadre.slice(0, 70));
+      /* l'attribut qui faisait tout rater côté YouTube : sans referrer, le
+         lecteur se refuse (« Video player configuration error », Error 153) */
+      const elCadre = dv.querySelector('.modal.vod iframe');
+      check('fiche : le cadre envoie l’origine du site (sinon Error 153 côté lecteur)',
+        !!elCadre && elCadre.getAttribute('referrerpolicy') === 'origin', elCadre ? 'referrerpolicy=' + elCadre.getAttribute('referrerpolicy') : 'aucun cadre');
       check('fiche : la fenêtre vidéo garde une porte de sortie vers la source', !!dv.querySelector('.modal.vod .close') && /youtube\.com\/watch/.test(dv.querySelector('.vod-aide a').getAttribute('href')));
       const cadreEl = dv.querySelector('.modal.vod iframe');
       if (cadreEl) cadreEl.remove();

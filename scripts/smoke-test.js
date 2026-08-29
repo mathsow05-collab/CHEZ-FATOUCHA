@@ -494,6 +494,10 @@ const J = async (method, url, body, token) => {
     check('la CSP autorise le cadre des lecteurs reconnus (sinon la fiche affiche un lecteur vide)',
       !!fsCsp && HOTES_CADRE.every((h) => fsCsp.includes('https://' + h)) && !/\*/.test(fsCsp) && !/\shttps?:\s/.test(fsCsp), fsCsp.slice(0, 120) || 'AUCUNE directive frame-src');
     check('default-src reste strict (le cadre n’ouvre pas le site à tout le monde)', /default-src 'self'/.test(csp), ligne('default-src'));
+    const jsCadre = await (await fetch(BASE + '/js/app.js')).text();
+    const balise = (jsCadre.match(/<iframe[^>]*/g) || []).join('');
+    check('le cadre ne coupe pas le referrer (le lecteur refuserait de se configurer)',
+      /referrerpolicy="origin"/.test(balise) && !/referrerpolicy="no-referrer"/.test(balise), balise.slice(0, 90) || 'aucune balise iframe');
     await J('PUT', '/api/admin/produits/' + p0.id, { video_url: 'https://www.youtube.com/shorts/dQw4w9WgXcQ', video_miniature: '' }, tok);
     const accueilAvec = await (await fetch(BASE + '/')).text();
     check('un article en Short fait apparaître la rubrique sur l’accueil', /id="shorts"[\s\S]*class="short-tuile"/.test(accueilAvec) && /data-short="/.test(accueilAvec));

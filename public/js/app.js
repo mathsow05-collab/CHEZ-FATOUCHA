@@ -1257,6 +1257,12 @@ function avecAutoplay(cadre) {
   return cadre + (String(cadre).indexOf('?') >= 0 ? '&' : '?') + 'autoplay=1';
 }
 
+/* Le referrer du cadre n'est pas un détail de vie privée qu'on peut couper :
+   YouTube et Vimeo vérifient l'origine de la page qui les encastre. Avec un
+   iframe en referrerpolicy="no-referrer", le lecteur se refuse et affiche
+   « Video player configuration error » (Error 153) — le HTML, lui, reste net,
+   seul l'écran du cadre parle. On envoie donc l'origine seule : ni le chemin
+   de la fiche, ni un paramètre de suivi. */
 function ouvrirVideo(p) {
   const v = p.video;
   if (!v || !v.cadre) return;
@@ -1264,7 +1270,7 @@ function ouvrirVideo(p) {
     <button class="close" data-x aria-label="Fermer la vidéo">${icone('croix')}</button>
     <div class="vod-cadre${v.format === 'vertical' ? ' vertical' : ''}">
       ${v.miniature ? `<img class="vod-fond" src="${esc(v.miniature)}" alt="" />` : ''}
-      <iframe src="${esc(avecAutoplay(v.cadre))}" title="Vidéo de ${esc(p.titre)}" referrerpolicy="no-referrer" allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write" allowfullscreen></iframe>
+      <iframe src="${esc(avecAutoplay(v.cadre))}" title="Vidéo de ${esc(p.titre)}" referrerpolicy="origin" allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write" allowfullscreen></iframe>
     </div>
     <div class="vod-aide">${icone('lecture', { taille: 14 })}<span>La lecture vient de ${esc(v.etiquette)} : ça compte sur ton forfait.</span><a href="${esc(v.page)}" target="_blank" rel="noopener">Ouvrir sur ${esc(v.etiquette)}</a></div>
   </div>`);
