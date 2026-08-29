@@ -216,6 +216,10 @@ nav.main a.on { background: transparent; color: var(--ink); border-bottom-color:
 .btn.terra { background: var(--bordeaux); border-color: var(--bordeaux); color: #fff }
 .btn.ghost { background: transparent; color: var(--ink); border-color: var(--filet-2) }
 .btn.ghost:hover { background: transparent; color: var(--bordeaux-2); border-color: var(--bordeaux) }
+/* Sur le bandeau sombre du haut, le fantôme doit rester lisible : même bouton,
+   mais habillé pour un fond d'encre (sinon l'encre sur l'encre disparaît). */
+.hero .btn.ghost { color: var(--ivoire); border-color: rgba(247, 243, 236, .36) }
+.hero .btn.ghost:hover { color: var(--or-clair); border-color: var(--or-clair) }
 .btn.wave { background: var(--wave); color: #04303d; border-color: var(--wave) }
 .btn.orange { background: var(--orange); color: #3b1c00; border-color: var(--orange) }
 .btn.big { height: 54px; font-size: 12.5px; padding: 0 28px; border-radius: 2px }
