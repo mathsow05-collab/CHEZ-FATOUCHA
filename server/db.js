@@ -210,6 +210,9 @@ function ajouterColonne(table, definition) {
 /* Fiches produit : URL propre, vidéo, guide des tailles, mannequin, texte alternatif. */
 ajouterColonne('produits', 'slug TEXT');
 ajouterColonne('produits', 'video_url TEXT');
+/* La miniature de la vidéo, recopiée chez nous à l'enregistrement : la fiche ne doit
+   pas dépendre d'un serveur tiers pour afficher une image. */
+ajouterColonne('produits', 'video_miniature TEXT');
 ajouterColonne('produits', 'mannequin TEXT');
 ajouterColonne('produits', 'guide_tailles TEXT NOT NULL DEFAULT \'{}\'');
 /* Catégories : URL /categorie/<slug>. */

@@ -414,6 +414,40 @@ const J = async (method, url, body, token) => {
     const santeImg = await J('GET', '/api/health');
     check('la santé du service dit où en la préparation des images', santeImg.data.images && typeof santeImg.data.images.total === 'number' && typeof santeImg.data.images.en_cours === 'boolean', JSON.stringify(santeImg.data.images));
 
+    console.log('— Vidéo de fiche : un lien collé, une miniature, rien qui charge avant le geste —');
+    const vYoutube = await J('POST', '/api/admin/video-info', { url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' }, tok);
+    check('un lien YouTube est reconnu (lecteur intégré, format paysage)', vYoutube.data.ok && vYoutube.data.fournisseur === 'youtube' && vYoutube.data.format === 'paysage' && vYoutube.data.integrateur === 'cadre', JSON.stringify(vYoutube.data).slice(0, 110));
+    const vShorts = await J('POST', '/api/admin/video-info', { url: 'https://youtube.com/shorts/dQw4w9WgXcQ' }, tok);
+    check('un Short est reconnu comme vertical (le cadre ne sera pas écrasé)', vShorts.data.format === 'vertical', vShorts.data.format);
+    for (const [lien, nom] of [['https://vimeo.com/76979871', 'vimeo'], ['https://www.tiktok.com/@maison/video/7301234567890123456', 'tiktok'], ['https://www.instagram.com/reel/C12abCD34eF/', 'instagram']]) {
+      const r = await J('POST', '/api/admin/video-info', { url: lien }, tok);
+      check(`le lien ${nom} est reconnu aussi`, r.data.ok && r.data.fournisseur === nom, JSON.stringify(r.data).slice(0, 80));
+    }
+    const vMauvais = await J('POST', '/api/admin/video-info', { url: 'https://n-importe-quoi.test/x' }, tok);
+    check('un lien de n’importe où est refusé à l’aperçu (422)', vMauvais.status === 422, 'HTTP ' + vMauvais.status);
+    await J('PUT', '/api/admin/produits/' + p0.id, { video_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' }, tok);
+    const avecVideo = (await J('GET', '/api/produits/' + p0.id)).data;
+    check('l’objet video arrive à la fiche cliente', avecVideo.video && avecVideo.video.cadre && /^https:\/\/www\.youtube-nocookie\.com\/embed\//.test(avecVideo.video.cadre), avecVideo.video && avecVideo.video.cadre);
+    check('la miniature vient du site ou du fournisseur, jamais d’un traqueur', !avecVideo.video.miniature || /^(\/uploads\/\/img\/|https:\/\/i\.ytimg\.com\/)/.test(avecVideo.video.miniature), avecVideo.video.miniature);
+    /* le guide des tailles est un objet, pas une liste : c'est le champ qui sautait
+       en premier quand une mise à jour n'envoyait que le prix ou le lien vidéo */
+    await J('PUT', '/api/admin/produits/' + p0.id, { guide_tailles: { M: { poitrine: 90, taille: 72, hanches: 96, longueur: 134 } }, mannequin: 'Portée par Awa.' }, tok);
+    await J('PUT', '/api/admin/produits/' + p0.id, { prix: p0.prix }, tok);
+    const apresPrix = (await J('GET', '/api/produits/' + p0.id)).data;
+    check('une mise à jour qui ne touche que le prix laisse le guide des tailles en place', Object.keys(apresPrix.guide_tailles || {}).join(',') === 'M' && apresPrix.mannequin === 'Portée par Awa.', JSON.stringify({ g: Object.keys(apresPrix.guide_tailles || {}), m: apresPrix.mannequin }));
+    check('une mise à jour qui ne touche que le prix laisse la vidéo en place', !!apresPrix.video && /youtube/.test(apresPrix.video.cadre || ''), JSON.stringify(apresPrix.video && apresPrix.video.fournisseur));
+    const htmlVideo = await (await fetch(BASE + '/produit/' + (avecVideo.slug || p0.id))).text();
+    check('la fiche montre la vignette et la pastille dans la pellicule', /class="vod-cart"/.test(htmlVideo) && /class="thumb-vod"/.test(htmlVideo));
+    check('aucun lecteur n’est dans la page : rien ne charge avant le toucher', !/<iframe/.test(htmlVideo));
+    check('VideoObject dans le balisage (la vidéo peut remonter dans Google)', /"@type":"VideoObject"/.test(htmlVideo));
+    check('le lien de secours pointe vers la vidéo d’origine', new RegExp('href="https://www\\.youtube\\.com/watch').test(htmlVideo));
+    await J('PUT', '/api/admin/produits/' + p0.id, { video_url: '/uploads/produits/clip-demo.mp4' }, tok);
+    const htmlFichier = await (await fetch(BASE + '/produit/' + (avecVideo.slug || p0.id))).text();
+    check('un fichier déposé sur le site est lu directement (pas de cadre tiers)', /<video controls[^>]*src="\/uploads\/produits\/clip-demo\.mp4"/.test(htmlFichier) && !/<iframe/.test(htmlFichier));
+    await J('PUT', '/api/admin/produits/' + p0.id, { video_url: '', guide_tailles: {}, mannequin: '' }, tok);
+    const vide = (await J('GET', '/api/produits/' + p0.id)).data;
+    check('vider le champ enlève tout bloc vidéo de la fiche', vide.video === null && !/vod-cart/.test(await (await fetch(BASE + '/produit/' + (avecVideo.slug || p0.id))).text()), JSON.stringify(vide.video));
+
     console.log('— Avis clientes : envoi, modération, réputation —');
     const sansAvis = (await J('GET', '/api/produits/' + p0.id)).data;
     check('note moyenne renvoyée avec le produit', sansAvis.avis && typeof sansAvis.avis.nombre === 'number', JSON.stringify(sansAvis.avis));

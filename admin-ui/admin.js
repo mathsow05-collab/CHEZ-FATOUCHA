@@ -304,15 +304,17 @@ async function formProduit(p) {
     </div>
 
     <div class="bloc" style="background:#fff">
-      <h3>🎬 Vidéo &amp; réassurance <span class="small muted" style="font-weight:400;text-transform:none;letter-spacing:0">— ce qui fait acheter en ligne</span></h3>
+      <h3>Vidéo &amp; réassurance <span class="small muted" style="font-weight:400;text-transform:none;letter-spacing:0">— ce qui fait acheter en ligne</span></h3>
       <div class="mini-form">
-        <div class="field full"><label>Vidéo de la pièce (MP4/WebM ou lien)</label>
+        <div class="field full"><label>Vidéo de la pièce (lien YouTube, ou MP4 déposé ici)</label>
           <div class="row" style="gap:8px">
-            <input class="inp" id="f-video" value="${esc(data.video_url || '')}" placeholder="/uploads/produits/… .mp4  ou  https://…" />
+            <input class="inp" id="f-video" value="${esc(data.video_url || '')}" placeholder="https://www.youtube.com/watch?v=…  ·  /uploads/produits/… .mp4" />
             <button class="btn sm ghost" id="f-topvideo" type="button">Téléverser</button>
             <input type="file" id="f-videofile" accept="video/mp4,video/webm" class="hidden" />
           </div>
-          <span class="small muted">10 secondes maximum, le tissu qui bouge. Laisse vide pour n'avoir que les photos.</span>
+          <input type="hidden" id="f-video-mini" value="${esc(data.video_miniature || '')}" />
+          <div id="f-video-out" class="small muted"></div>
+          <span class="small muted">Colle le lien de la vidéo que tu as mise sur YouTube (un Short marche aussi) : la fiche montrera une miniature, et la lecture ne démarrera que si la cliente la touche — rien de lourd pour elle. 10 secondes suffisent, le tissu qui bouge. Laisse vide pour n'avoir que les photos.</span>
         </div>
         <div class="field full"><label>Message « portée par »</label>
           <input class="inp" id="f-mannequin" value="${esc(data.mannequin || '')}" placeholder="Photo portée par Awa, 1,72 m, 58 kg — elle porte du S." />
@@ -415,6 +417,42 @@ async function formProduit(p) {
     btn.disabled = false; btn.textContent = 'Téléverser';
   });
 
+  /* Le lien collé est reconnu tout de suite, pour que la vendeuse voie ce que
+     la fiche va devenir avant d'enregistrer. La miniature est recopiée sur le
+     site à cette occasion : la fiche ne dépendra pas d'un serveur tiers pour
+     afficher une image. */
+  const champVideo = f.querySelector('#f-video');
+  const sortieVideo = f.querySelector('#f-video-out');
+  async function reconnaitreVideo() {
+    const brut = champVideo.value.trim();
+    if (!brut) {
+      sortieVideo.innerHTML = '';
+      f.querySelector('#f-video-mini').value = '';
+      return;
+    }
+    sortieVideo.textContent = 'Lecture du lien…';
+    try {
+      const r = await aReq('POST', '/api/admin/video-info', { url: brut });
+      const format = r.format === 'vertical' ? 'format vertical (9:16)' : r.format === 'libre' ? 'fichier lu directement' : 'format paysage (16:9)';
+      sortieVideo.innerHTML = `<span class="tag payee">${esc(r.etiquette)}</span> ${esc(format)} · ${r.integrateur === 'cadre' ? 'lecteur intégré au toucher' : 'fichier du site'}${r.miniature_site ? ' · miniature recopiée ✔' : ''}`
+        + (r.miniature_site ? ` <button class="btn sm ghost" type="button" id="f-video-phot">Utiliser la miniature comme photo</button>` : '')
+        + (r.avertissement ? `<br><span class="small muted">${esc(r.avertissement)}</span>` : '');
+      f.querySelector('#f-video-mini').value = r.miniature_site || '';
+      const bout = f.querySelector('#f-video-phot');
+      if (bout) bout.addEventListener('click', () => {
+        if (imgs.some((im) => im.url === r.miniature_site)) return toast('Elle est déjà dans les photos.', 'ko');
+        imgs.push({ url: r.miniature_site, is_main: imgs.length ? 0 : 1 });
+        drawImgs();
+        toast('Miniature ajoutée aux photos ✔', 'ok');
+      });
+    } catch (e) {
+      sortieVideo.innerHTML = `<span class="tag annulee">lien non reconnu</span> ${esc(e.message)} — YouTube, Shorts, Vimeo, TikTok, Instagram, ou un .mp4 déposé ici.`;
+    }
+  }
+  champVideo.addEventListener('change', reconnaitreVideo);
+  champVideo.addEventListener('blur', () => { if (champVideo.value.trim()) reconnaitreVideo(); });
+  if (champVideo.value.trim()) reconnaitreVideo();
+
   f.querySelector('#f-addurl').addEventListener('click', async (e) => {
     const u = f.querySelector('#f-imgurl').value.trim();
     if (!u) return;
@@ -494,6 +532,7 @@ async function formProduit(p) {
       coloris: f.querySelector('#f-coloris').value.split(',').map((x) => x.trim()).filter(Boolean),
       variantes: (box._cells || []).map((c, i) => ({ taille: c.t, coloris: c.c, stock: Number(box.querySelector(`[data-vi="${i}"]`)?.value) || 0 })),
       video_url: f.querySelector('#f-video').value.trim(),
+      video_miniature: f.querySelector('#f-video-mini').value,
       mannequin: f.querySelector('#f-mannequin').value.trim(),
       guide_tailles: lisGuide(),
     };

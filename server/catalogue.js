@@ -1,9 +1,14 @@
 /* Logique catalogue partagée (front client, rendu serveur, espace admin). */
 const { db, getSetting, addLog, STOCK_STATUTS_ACTIFS, slugifier, slugLibre } = require('./db');
 const optima = require('./optima');
+const videos = require('./videos');
 
 function parseJson(raw, fallback = []) {
   if (Array.isArray(raw)) return raw;
+  /* un objet déjà décodé arrive telle quelle : une mise à jour partielle envoie
+     ce que la lecture avait rendu (le guide des tailles, surtout) — le passer par
+     JSON.parse le transformait en chaîne et faisait disparaître la donnée. */
+  if (raw && typeof raw === 'object') return raw;
   try {
     const v = JSON.parse(raw ?? 'null');
     return v === null || v === undefined ? fallback : v;
@@ -240,6 +245,31 @@ function completeLeLook(row, { limite = 8 } = {}) {
   return rows.map(produitPublic);
 }
 
+/** La vidéo de la fiche, prête à être posée dans le gabarit : ni la page cliente
+ *  ni le rendu serveur n'ont à reconnaître un lien. Renvoie null si le lien n'est
+ *  pas un fournisseur connu (dans ce cas on ne montre rien d'intégré).
+ *  `cadre` n'est rempli que si l'adresse est bien l'un des lecteurs autorisés. */
+function videoDe(row) {
+  const brut = row.video_url || null;
+  if (!brut) return null;
+  const a = videos.analyser(brut);
+  if (!a.ok) return { brut, fournisseur: 'inconnu', etiquette: 'lien', page: brut, cadre: null, miniature: null, format: 'libre' };
+  const miniature = row.video_miniature || a.miniature || null;
+  return {
+    brut,
+    fournisseur: a.fournisseur,
+    etiquette: a.etiquette,
+    page: a.page,
+    /* un fichier du site s'affiche dans un <video>, les autres dans un cadre
+       qui n'est jamais fabriqué ici mais reconnu à l'enregistrement */
+    cadre: a.local ? null : videos.cadreAutorise(a.cadre) ? a.cadre : null,
+    fichier: a.local ? a.page : null,
+    miniature,
+    miniature_du_site: !!row.video_miniature,
+    format: a.format,
+  };
+}
+
 function produitPublic(row) {
   if (!row) return null;
   const images = imagesEnrichies(row.images);
@@ -259,6 +289,7 @@ function produitPublic(row) {
        boutique, pas un argument de vente. La marque mise en avant reste celle de la maison. */
     delai_jours: row.delai_jours,
     video_url: row.video_url || null,
+    video: videoDe(row),
     mannequin: row.mannequin || null,
     guide_tailles: lireGuide(row.guide_tailles),
     images,
@@ -358,7 +389,7 @@ function preparerSlug(titre, id = null, slugDemande = '') {
   return slugLibre(base, 'produits', id);
 }
 
-module.exports = {
+module.exports = { videoDe, produitPublic,
   db,
   parseJson,
   optima,

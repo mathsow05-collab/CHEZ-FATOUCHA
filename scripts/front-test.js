@@ -258,6 +258,53 @@ const J = async (method, url, body, token) => {
     w.go('/');
     await until(() => d.querySelectorAll('#boutique-grid .card').length > 0, { label: 'retour catalogue' });
 
+    /* --- la vidéo de l'article : reconnue, montrée, lue au toucher ---
+       Dans sa propre fenêtre, chargée en direct (le rendu serveur est vérifié
+       côté smoke) : ce bloc navigue, et la suite compte les lignes du panier.
+       Et avec SON tableau d'erreurs : au toucher, le cadre pointe vraiment vers
+       le lecteur YouTube, que jsdom charge et exécute — ses erreurs à lui ne sont
+       pas les nôtres, on ne retient que celles qui touchent nos fichiers. */
+    await J('PUT', '/api/admin/produits/1', { video_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' }, jetonAdmin);
+    const vcVod = new VirtualConsole();
+    const bruitVod = [];
+    const nosFichiers = (t) => /\/js\/(app|api|icones|mouvement)\.js/.test(String(t));
+    const garderVod = (e) => { const t = (e && e.stack) || String(e); if (nosFichiers(t)) bruitVod.push(t.split('\n')[0].trim()); };
+    vcVod.on('jsdomError', garderVod);
+    vcVod.on('error', (...a) => { const t = a.join(' '); if (nosFichiers(t)) bruitVod.push(t); });
+    const domVod = await JSDOM.fromURL(BASE + '/produit/1', {
+      ...opts, virtualConsole: vcVod,
+      beforeParse: (window) => brancher(window, garderVod),
+    });
+    const wv = domVod.window;
+    const dv = wv.document;
+    try {
+      /* la carte est d'abord celle du rendu serveur : on attend que le script
+         l'ait remplacée par la sienne, sinon on cliquerait un morceau de HTML
+         sans écouteur derrière */
+      await until(() => dv.getElementById('pd-qte') && dv.querySelector('.vod-cart'), { label: 'carte vidéo hydratée' });
+      check('fiche : la pastille vidéo se range avec les vignettes', !!dv.querySelector('.thumb-vod') && !!dv.querySelector('.vod-cart'), `(${dv.querySelectorAll('.thumbs > *').length} vignettes dont la vidéo)`);
+      check('fiche : aucun lecteur tiers avant le toucher', dv.querySelectorAll('iframe').length === 0 && /href="https:\/\/www\.youtube\.com\/watch/.test(dv.querySelector('.vod-cart').outerHTML));
+      for (let i = 0; i < 8 && !dv.querySelector('.modal.vod iframe'); i++) {
+        dv.querySelector('.vod-cart').click();
+        await wait(120);
+      }
+      const cadreVod = dv.querySelector('.modal.vod iframe') || { getAttribute: () => 'aucun cadre' };
+      const srcCadre = cadreVod.getAttribute('src');
+      check('fiche : au toucher, le lecteur sans pistage démarre', /youtube-nocookie\.com\/embed\//.test(srcCadre) && /autoplay=1/.test(srcCadre), srcCadre.slice(0, 70));
+      check('fiche : la fenêtre vidéo garde une porte de sortie vers la source', !!dv.querySelector('.modal.vod .close') && /youtube\.com\/watch/.test(dv.querySelector('.vod-aide a').getAttribute('href')));
+      const cadreEl = dv.querySelector('.modal.vod iframe');
+      if (cadreEl) cadreEl.remove();
+      dv.dispatchEvent(new wv.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      await wait(120);
+      check('fiche : Échap referme la vidéo', !dv.querySelector('.modal.vod'));
+      check('fenêtre vidéo : aucune erreur dans nos propres scripts', bruitVod.length === 0, bruitVod.slice(0, 2).join(' | '));
+      wv.eval('window.Mesure && Mesure.vider()');
+      await wait(120);
+    } finally {
+      await J('PUT', '/api/admin/produits/1', { video_url: '' }, jetonAdmin);
+      wv.close();
+    }
+
     /* --- espace vendeur : page séparée /admin, ouverte dans sa propre fenêtre --- */
     domAdm = await JSDOM.fromURL(BASE + '/admin#produits', { ...opts, beforeParse: (window) => { brancher(window); window.localStorage.setItem('fatoucha_admin_token', jetonAdmin); } });
     const wa = domAdm.window;

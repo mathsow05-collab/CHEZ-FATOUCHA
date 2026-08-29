@@ -128,6 +128,31 @@ function etoiles(note) {
 }
 
 /* ---------------- pages ---------------- */
+/* La vidéo d'un article, côté serveur.
+   Une miniature et un lien : JAMAIS le lecteur chargé d'office. Un cadre YouTube
+   qu'on n'a pas demandé, c'est une demi-seconde de plus, 500 Ko et deux
+   résolutions de nom — exactement ce que nous venons d'enlever aux photos. Le
+   lecteur n'arrive qu'au toucher, dans le script de la page (`data-vod`). */
+function blocVideo(p, images) {
+  const v = p.video;
+  if (!v) return '';
+  const repli = (images[0] && images[0].url) || '/media/demo/robe-boheme.svg';
+  const vignette = optima.baliseImage(v.miniature || repli, '', { largeurs: [220, 480], sizes: '(max-width:640px) 92vw, 420px', cls: 'vod-img', repli });
+  /* un fichier déposé sur le site : le lecteur du dépôt suffit, pas de cadre tiers */
+  if (v.fichier) {
+    return `<div class="video-box"><video controls playsinline preload="none" poster="${ech(v.miniature || repli)}" src="${ech(v.fichier)}"></video>
+      <div class="small muted">Vidéo de l’article réel, filmée par la boutique.</div></div>`;
+  }
+  /* un lien qu'on sait intégrer : la vignette s'ouvre en grand au toucher.
+     Le lien pointe aussi vers l'original — pour celles et ceux qui n'ont pas de
+     JavaScript, ou une connexion trop mauvaise pour un cadre. */
+  return `<a class="vod-cart" href="${ech(v.page)}" target="_blank" rel="noopener" data-vod
+     aria-label="Lire la vidéo de l’article (${ech(v.etiquette)})">
+    <span class="vod-mini">${vignette}<span class="vod-play">${icone('lecture', { taille: 15 })}</span></span>
+    <span class="vod-legende">Vidéo de l’article · ${ech(v.etiquette)}<span class="vod-duree">au toucher</span></span>
+  </a>`;
+}
+
 function accueil(req) {
   const cfg = reglages(req);
   const recents = listerProduits({ limit: 12 }).map(produitPublic);
@@ -321,9 +346,8 @@ function produit(req, row) {
   <div class="wrap"><div class="pd">
     <div class="gallery">
       <div class="main">${optima.baliseImage(images[0].url, images[0].legende || p.titre, { sizes: '(max-width:900px) 94vw, 520px', priorité: true, id: 'gal-main' })}</div>
-      ${images.length > 1 ? `<div class="thumbs">${images.map((im, i) => `<button class="${i === 0 ? 'on' : ''}" data-thumb="${i}" aria-label="Photo ${i + 1}">${optima.baliseImage(im.url, '', { largeurs: [220], sizes: '74px' })}</button>`).join('')}</div>` : ''}
-      ${p.video_url && /(^\/uploads\/|\\.(mp4|webm)$)/i.test(p.video_url) ? `<div class="video-box"><video controls playsinline preload="none" poster="${ech(images[0].url)}" src="${ech(p.video_url)}"></video></div>` : ''}
-      ${p.video_url && !/(^\/uploads\/|\\.(mp4|webm)$)/i.test(p.video_url) ? `<a class="btn ghost block" href="${ech(p.video_url)}" rel="noopener">▶ Voir la vidéo du produit</a>` : ''}
+      ${images.length > 1 || (p.video && p.video.cadre) ? `<div class="thumbs">${images.map((im, i) => `<button class="${i === 0 ? 'on' : ''}" data-thumb="${i}" aria-label="Photo ${i + 1}">${optima.baliseImage(im.url, '', { largeurs: [220], sizes: '74px' })}</button>`).join('')}${p.video && p.video.cadre ? `<a class="thumb-vod" href="${ech(p.video.page)}" target="_blank" rel="noopener" data-vod aria-label="Vidéo de l’article (${ech(p.video.etiquette)})"><img src="${ech(p.video.miniature || images[0].url)}" alt="" loading="lazy" /><span class="vod-badge">${icone('lecture', { taille: 16 })}</span></a>` : ''}</div>` : ''}
+      ${blocVideo(p, images)}
     </div>
     <div class="stack">
       <div>
@@ -381,6 +405,21 @@ function produit(req, row) {
         itemCondition: 'https://schema.org/NewCondition',
         seller: { '@type': 'Organization', name: cfg.nom_boutique || 'Chez Fatoucha' },
       },
+      /* une vidéo reconnue vaut une place dans les résultats Google (rich result) */
+      ...(p.video && (p.video.cadre || p.video.fichier)
+        ? {
+          video: [{
+            '@type': 'VideoObject',
+            name: `${p.titre} — vidéo ${cfg.nom_boutique || 'Chez Fatoucha'}`,
+            description: (p.description || p.titre).slice(0, 480),
+            thumbnailUrl: cfg._url + (p.video.miniature || images[0].url),
+            embedUrl: p.video.cadre || undefined,
+            url: p.video.cadre ? cfg._url + (p.url || `/produit/${p.id}`) : p.video.page,
+            contentUrl: p.video.fichier || undefined,
+            contentRating: 'NR',
+          }],
+        }
+        : {}),
       ...(resume.nombre
         ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: resume.moyenne, reviewCount: resume.nombre, bestRating: 5, worstRating: 1 } }
         : {}),
@@ -670,4 +709,4 @@ function robots(base) {
   ].filter((l, i, a) => l !== '' || i === a.length - 1).join('\n');
 }
 
-module.exports = { accueil, boutique, categorie, produit, pageContenu, confirmation, pageHTML, sitemap, robots, faqDepuisMarkdown, ech, fcfa, reglages, baseAbsolue };
+module.exports = { blocVideo, accueil, boutique, categorie, produit, pageContenu, confirmation, pageHTML, sitemap, robots, faqDepuisMarkdown, ech, fcfa, reglages, baseAbsolue };

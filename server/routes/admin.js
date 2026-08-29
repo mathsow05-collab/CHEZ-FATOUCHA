@@ -15,6 +15,7 @@ const {
 const optima = require('../optima');
 const paiement = require('../paiement');
 const scrape = require('../scrape');
+const videos = require('../videos');
 
 const { UPLOADS_DIR } = require('../paths');
 const IMG_DIR = path.join(UPLOADS_DIR, 'produits');
@@ -147,6 +148,9 @@ router.get('/produits', (req, res) => {
       marque: r.marque || '',
       prix_achat: r.prix_achat,
       lien_source: r.lien_source || '',
+      /* la miniature recopiée pour la vidéo : utile au formulaire pour qu'il la
+         renvoie tel quel à l'enregistrement (sinon elle sauterait à chaque modif) */
+      video_miniature: r.video_miniature || '',
       updated_at: r.updated_at,
       reserve: qReserve.get(r.id, ...STOCK_STATUTS_ACTIFS).n,
     }))
@@ -156,12 +160,21 @@ router.get('/produits', (req, res) => {
 /* Vidéo de fiche : fichier téléversé sur le site, ou lien externe (TikTok/
    YouTube) que la cliente ouvre dans un onglet — on n'encastre pas un lecteur
    tiers dans la page (préférence explicite de la politique de sécurité). */
+/* Une seule règle pour savoir si un lien vaut quelque chose : celle du module qui
+   le reconnaît — sinon l'aperçu du formulaire accepterait ce que l'enregistrement
+   refuse (ou l'inverse), et ce serait le champ lui-même qui ment. */
 function nettoyerVideo(v) {
   const brut = String(v || '').trim();
   if (!brut) return null;
-  if (/^\/uploads\/[a-z0-9._\/-]+$/i.test(brut)) return brut.slice(0, 400);
-  if (/^https?:\/\/(www\.)?(youtube\.com|youtu\.be|vimeo\.com|tiktok\.com|instagram\.com)\/\S{1,300}$/i.test(brut)) return brut.slice(0, 400);
-  return null;
+  return videos.analyser(brut).ok ? brut.slice(0, 400) : null;
+}
+
+/* La miniature n'est pas une URL libre : soit un fichier que le site a recopié
+   lui-même, rien d'autre (sinon le champ servirait à pister les visiteuses). */
+function nettoyerMiniatureVideo(v) {
+  const brut = String(v || '').trim();
+  if (!brut) return null;
+  return /^\/uploads\/[a-z0-9._\/-]+\.(jpe?g|png|webp|avif)$/i.test(brut) ? brut.slice(0, 400) : null;
 }
 
 function nettoyerProduit(b) {
@@ -192,6 +205,7 @@ function nettoyerProduit(b) {
       /* Une vidéo de 5 secondes qui montre le tissu qui bouge vend mieux que
          trois photos fixes ; soit un fichier du site, soit un lien externe. */
       video_url: nettoyerVideo(b.video_url),
+      video_miniature: nettoyerMiniatureVideo(b.video_miniature),
       mannequin: String(b.mannequin || '').trim().slice(0, 160) || null,
       guide_tailles: ecrireGuide(b.guide_tailles),
       images: JSON.stringify(images),
@@ -221,9 +235,10 @@ router.post('/produits', (req, res) => {
   const r = db
     .prepare(
       `INSERT INTO produits (titre, description, prix, prix_barre, prix_achat, marque, lien_source, delai_jours,
-        images, tailles, coloris, stock, categorie_id, actif, vedette, slug, video_url, mannequin, guide_tailles)
+        images, tailles, coloris, stock, categorie_id, actif, vedette, slug, video_url, video_miniature,
+        mannequin, guide_tailles)
        VALUES (@titre,@description,@prix,@prix_barre,@prix_achat,@marque,@lien_source,@delai_jours,
-        @images,@tailles,@coloris,@stock,@categorie_id,@actif,@vedette,@slug,@video_url,@mannequin,@guide_tailles)`
+        @images,@tailles,@coloris,@stock,@categorie_id,@actif,@vedette,@slug,@video_url,@video_miniature,@mannequin,@guide_tailles)`
     )
     .run(valeurs2);
   appliquerVariantes(Number(r.lastInsertRowid), req.body);
@@ -254,7 +269,10 @@ function pourMaj(avant) {
     actif: !!avant.actif,
     vedette: !!avant.vedette,
     video_url: avant.video_url || '',
+    video_miniature: avant.video_miniature || '',
     mannequin: avant.mannequin || '',
+    /* décodé puis renvoyé tel quel : nettoyerProduit le relit, et le guide ne
+       doit pas disparaître quand on ne modifie qu'un prix ou un lien vidéo */
     guide_tailles: lireGuide(avant.guide_tailles),
     slug: avant.slug,
   };
@@ -272,6 +290,7 @@ router.put('/produits/:id', (req, res) => {
     `UPDATE produits SET titre=@titre, description=@description, prix=@prix, prix_barre=@prix_barre, prix_achat=@prix_achat,
        marque=@marque, lien_source=@lien_source, delai_jours=@delai_jours, images=@images, tailles=@tailles, coloris=@coloris,
        stock=@stock, categorie_id=@categorie_id, actif=@actif, vedette=@vedette, slug=@slug, video_url=@video_url,
+       video_miniature=@video_miniature,
        mannequin=@mannequin, guide_tailles=@guide_tailles, updated_at=@updated_at WHERE id=@id`
   ).run({
     ...valeurs,
@@ -479,6 +498,37 @@ router.post('/upload', upload.array('files', 10), async (req, res) => {
   urls.forEach((u) => require('../rechauffage').apresUpload(u));
   addLog('upload_images', { source: 'admin', ref: String(req.admin.username), details: urls.join(' ') });
   return res.json({ urls, economise_ko: Math.round(gagner / 1024) });
+});
+
+/* Reconnaître le lien de vidéo collé par la vendeuse : ce qu'on sait l'intégrer,
+   son format, et — pour YouTube — la miniature recopiée dans nos dossiers.
+   Rien n'est enregistré ici : la fiche est écrite quand le formulaire est validé,
+   et la miniature revient avec lui dans `video_miniature`. */
+router.post('/video-info', async (req, res) => {
+  const a = videos.analyser(req.body?.url);
+  if (!a.ok) return res.status(422).json({ error: a.erreur });
+  const reponse = {
+    ok: true,
+    fournisseur: a.fournisseur,
+    etiquette: a.etiquette,
+    page: a.page,
+    format: a.format,
+    integrateur: a.local ? 'fichier' : 'cadre',
+    miniatures: [],
+    miniature_site: null,
+  };
+  if (a.miniature) {
+    /* trois tailles de la miniature, pour que la galerie n'attende pas un tiers */
+    reponse.miniatures = [a.miniature];
+    try {
+      const nom = await optima.reduire(IMG_DIR, await scrape.telechargerImage(a.miniature, IMG_DIR));
+      reponse.miniature_site = '/uploads/produits/' + nom;
+      require('../rechauffage').apresUpload(reponse.miniature_site);
+    } catch (e) {
+      reponse.avertissement = 'Miniature non récupérée (' + String(e.message || 'échec').slice(0, 60) + ') : celle de ' + a.etiquette + ' sera utilisée.';
+    }
+  }
+  return res.json(reponse);
 });
 
 /* Vidéo de fiche (5 à 10 s suffisent) : mp4/webm, 20 Mo max, même dossier. */

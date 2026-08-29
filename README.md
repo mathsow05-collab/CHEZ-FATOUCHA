@@ -233,6 +233,35 @@ L'admin touche **« ✔ Paiement reçu »** dans 📦 Commandes : la commande pa
 
 ---
 
+## Vidéo de l'article : tu colles le lien, la fiche s'occupe du reste
+
+Dans l'espace vendeur, au bloc « Vidéo & réassurance » : **colle l'URL de la
+vidéo que tu as mise sur YouTube** (un Short marche aussi, Vimeo, TikTok et
+Instagram sont reconnus pareil), ou téléverse un .mp4 de 20 Mo si tu préfères
+garder le fichier ici.
+
+Ce que le site en fait :
+
+- il **reconnaît le lien** et l'affiche aussitôt dans le formulaire (fournisseur,
+  format 16:9 ou 9:16) — un lien qu'il ne connaît pas est refusé, il ne devient
+  jamais un cadre ;
+- il **recopie la miniature** chez lui (`/uploads/produits/…`) : la vignette de la
+  fiche ne dépend donc pas de YouTube, et elle passe par le même pipeline AVIF/WebP
+  que les photos ;
+- la fiche montre la miniature **rangée avec les photos** (une pastille à la fin
+  de la pellicule) ;
+- **rien ne se charge avant le toucher** : ni cadre, ni script, ni piste du
+  tiers. C'est la cliente qui lance la lecture, et là seulement, en plein écran,
+  avec un lien pour ouvrir la vidéo chez YouTube si le cadre ne lui plaît pas ;
+- le balisage `VideoObject` est ajouté, pour que la vidéo puisse remonter dans les
+  résultats Google ;
+- chaque lecture est comptée (`lecture_video`), visible dans l'entonnoir.
+
+Une vidéo de 8 à 10 secondes qui montre le tissu qui bouge vaut mieux que trois
+photos fixes. Si tu déposes le fichier ici, souviens-toi que le disque de
+l'instance gratuite est remis à zéro à chaque redéploiement : le lien YouTube,
+lui, ne saute pas.
+
 ## Images : pourquoi les vignettes sont pré-cuites au build
 
 Les photos du site ne sont pas servies telles quelles : chaque visuel existe en
@@ -379,13 +408,13 @@ dans `render.yaml`). Alternative gratuite : sauvegarder régulièrement `data/fa
 npm run check:css    # 8 checks : thème (palette Prestige), variables réellement définies, aucun
                      # sélecteur mort (le CSS qui ne sert à rien est une dette), cloisonnement
                      # boutique / back-office
-npm run smoke        # 204 checks : catalogue, commande, stock par variante, paiement, admin, zones,
+npm run smoke        # 220 checks : catalogue, commande, stock par variante, paiement, admin, zones,
                      # sécurité ; rendu serveur + balisage + sitemap + robots ; polices réellement servies ; pipeline d'images
                      # (AVIF plus léger que WebP, cache disque, chemin tordu refusé) ; avis et
                      # modération ; alertes de retour en stock ; panier enregistré et reprise ;
                      # événements et entonnoir ; pages de contenu (markdown, échappement) ;
                      # acompte COD et confirmation ; « rien, côté cliente, ne mène au back-office »
-npm run test:front   # 101 checks : parcours client réel dans un DOM (jsdom) — catalogue filtré, fiche
+npm run test:front   # 107 checks : parcours client réel dans un DOM (jsdom) — catalogue filtré, fiche
                      # (vignettes, loupe, guide, calculateur de taille, avis envoyé), panier et reprise,
                      # commande, paiement, suivi — puis back-office dans sa propre fenêtre (avis,
                      # contenus, entonnoir, création d'un article avec guide et réassurance).

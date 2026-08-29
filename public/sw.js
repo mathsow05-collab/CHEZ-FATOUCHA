@@ -3,7 +3,7 @@
    encore le catalogue quand la connexion tombe. Rien d'automatique côté argent :
    les pages de commande, de paiement et le back-office ne sont jamais mis en
    cache, pour qu'aucune cliente ne voie un prix ou un stock périmé. */
-const VERSION = 'fatoucha-v3';
+const VERSION = 'fatoucha-v4';
 const MAX_IMG = 80;
 
 const JAMAIS = [/^\/api\/admin/, /^\/api\/commandes/, /^\/api\/paiement/, /^\/admin/, /\/(panier|commande|paiement)/];

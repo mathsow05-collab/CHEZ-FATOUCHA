@@ -379,8 +379,10 @@ async function vueProduit(cle) {
   const nb = p.avis?.nombre || 0;
   const note = p.avis?.moyenne || 0;
   const guide = p.guide_tailles && Object.keys(p.guide_tailles).length ? p.guide_tailles : null;
-  const video = p.video_url || null;
-  const videoInterne = video && /^\/uploads\//.test(video);
+  /* la fiche reçoit `video` déjà reconnue par le serveur (fournisseur, cadre
+     d'intégration, miniature) : le lien brut collé dans l'espace vendeur ne
+     sert plus jamais à construire une adresse ici. */
+  const video = p.video || null;
   return `
   ${topbar('boutique')}
   <div class="wrap fil-ariane">
@@ -392,13 +394,11 @@ async function vueProduit(cle) {
         <button class="main" data-zoom aria-label="Zoomer sur la photo (ou pincer sur mobile)">
           <img id="gal-main" src="${esc(images[0].grande || urlImg(images[0].url, 900))}"${images[0].srcset ? ` srcset="${esc(images[0].srcset)}"` : ''} sizes="(max-width:900px) 94vw, 520px" width="900" height="1200" fetchpriority="high" decoding="async" alt="${esc(images[0].legende || p.titre)}"
                onerror="this.src='/media/demo/robe-boheme.svg'" />
-          <span class="loupe" aria-hidden="true">⌕</span>
+          <span class="loupe" aria-hidden="true">${icone('zoom', { taille: 16 })}</span>
         </button>
-        ${images.length > 1 ? `<div class="thumbs">${images.map((im, i) => `<button data-thumb="${i}" class="${i === 0 ? 'on' : ''}" aria-label="Photo ${i + 1}${im.legende ? ' : ' + esc(im.legende) : ''}"><img src="${esc(im.miniature || urlImg(im.url, 220))}" alt="" loading="lazy" onerror="this.parentElement.remove()" /></button>`).join('')}</div>
-          <div class="gal-compte"><span id="gal-i">1</span> / ${images.length}${images[0].legende ? ` · ${esc(images[0].legende)}` : ''}</div>` : ''}
-        ${videoInterne ? `<div class="video-box"><video controls playsinline preload="none" poster="${esc(images[0].url)}" src="${esc(video)}"></video>
-          <div class="small muted">Vidéo de l’article réel, envoyée par la boutique.</div></div>` : ''}
-        ${video && !videoInterne ? `<a class="btn ghost block" href="${esc(video)}" target="_blank" rel="noopener">▶ Voir la vidéo du produit</a>` : ''}
+        ${images.length > 1 || (p.video && p.video.cadre) ? `<div class="thumbs">${images.map((im, i) => `<button data-thumb="${i}" class="${i === 0 ? 'on' : ''}" aria-label="Photo ${i + 1}${im.legende ? ' : ' + esc(im.legende) : ''}"><img src="${esc(im.miniature || urlImg(im.url, 220))}" alt="" loading="lazy" onerror="this.parentElement.remove()" /></button>`).join('')}${p.video && p.video.cadre ? `<a class="thumb-vod" href="${esc(p.video.page)}" target="_blank" rel="noopener" data-vod aria-label="Vidéo de l’article (${esc(p.video.etiquette)})"><img src="${esc(p.video.miniature || images[0].url)}" alt="" loading="lazy" /><span class="vod-badge">${icone('lecture', { taille: 16 })}</span></a>` : ''}</div>
+          <div class="gal-compte"><span id="gal-i">1</span> / ${images.length}${p.video && p.video.cadre ? ' · +1 vidéo' : ''}${images[0].legende ? ` · ${esc(images[0].legende)}` : ''}</div>` : ''}
+        ${carteVideo(p, images)}
         <div class="gal-actions">
           <button class="link" data-partage>${icone("partager", { taille: 15 })} Partager</button>
           <button class="link ${Favoris.contient(p.id) ? 'on' : ''}" data-fav="${p.id}">${icone("coeur", { taille: 15 })} ${Favoris.contient(p.id) ? 'Dans tes favoris' : 'Garder'}</button>
@@ -1120,6 +1120,13 @@ function bindProduit() {
   }));
   document.querySelectorAll('[data-thumb]').forEach((b) => b.addEventListener('click', () => afficherPhoto(Number(b.dataset.thumb))));
   document.querySelector('[data-zoom]')?.addEventListener('click', () => ouvrirLoupe(p, v.idx));
+  /* la pastille et la carte vidéo font la même chose ; un lien qu'on ne sait
+     pas intégrer garde son comportement de lien */
+  document.querySelectorAll('[data-vod]').forEach((b) => b.addEventListener('click', (e) => {
+    if (!p.video || !p.video.cadre) return;
+    e.preventDefault();
+    ouvrirVideo(p);
+  }));
   document.querySelector('[data-guide]')?.addEventListener('click', () => {
     const d = document.getElementById('pd-guide');
     if (d) { d.open = true; faireDefiler(d, { behavior: 'smooth', block: 'center' }); Mesure.envoyer('guide_tailles', p.id); }
@@ -1170,6 +1177,60 @@ function bindProduit() {
   });
   majDispo();
   if (requete().avis === '1') { Mesure.envoyer('clic_whatsapp', p.id, 'depuis-suivi'); setTimeout(() => ouvrirAvis(p), 250); }
+}
+
+/* ---------------- la vidéo de l'article ---------------- */
+/* Le lecteur n'existe qu'au toucher. Avant le geste, la fiche ne contient
+   qu'une image et un lien : pas de demi-seconde perdue, pas d'octets partis en
+   douceur pour quelqu'un qui ne voulait que le prix. */
+function carteVideo(p, images) {
+  const v = p.video;
+  if (!v) return '';
+  const repli = (images[0] && (images[0].miniature || images[0].url)) || '/media/demo/robe-boheme.svg';
+  if (v.fichier) {
+    return `<div class="video-box"><video controls playsinline preload="none" poster="${esc(v.miniature || repli)}" src="${esc(v.fichier)}"></video>
+      <div class="small muted">Vidéo de l’article réel, filmée par la boutique.</div></div>`;
+  }
+  if (!v.cadre) {
+    return `<a class="vod-cart" href="${esc(v.page)}" target="_blank" rel="noopener" data-vod>
+      <span class="vod-mini"><img class="vod-img" src="${esc(v.miniature || repli)}" alt="" loading="lazy" decoding="async" /><span class="vod-play">${icone('lecture', { taille: 15 })}</span></span>
+      <span class="vod-legende">Vidéo de l’article · ${esc(v.etiquette)}<span class="vod-duree">au toucher</span></span>
+    </a>`;
+  }
+  return `<a class="vod-cart" href="${esc(v.page)}" target="_blank" rel="noopener" data-vod
+     aria-label="Lire la vidéo de l’article (${esc(v.etiquette)})">
+    <span class="vod-mini"><img class="vod-img" src="${esc(v.miniature || repli)}" alt="" loading="lazy" decoding="async" /><span class="vod-play">${icone('lecture', { taille: 15 })}</span></span>
+    <span class="vod-legende">Vidéo de l’article · ${esc(v.etiquette)}<span class="vod-duree">au toucher</span></span>
+  </a>`;
+}
+
+/* L'autoplay n'est demandé qu'ici, parce que l'ouverture vient d'un geste :
+   sinon la plateforme joue toute seule et rame sur une petite connexion. */
+function avecAutoplay(cadre) {
+  return cadre + (String(cadre).indexOf('?') >= 0 ? '&' : '?') + 'autoplay=1';
+}
+
+function ouvrirVideo(p) {
+  const v = p.video;
+  if (!v || !v.cadre) return;
+  const m = el(`<div class="modal vod" role="dialog" aria-modal="true" aria-label="Vidéo de ${esc(p.titre)}">
+    <button class="close" data-x aria-label="Fermer la vidéo">${icone('croix')}</button>
+    <div class="vod-cadre${v.format === 'vertical' ? ' vertical' : ''}">
+      ${v.miniature ? `<img class="vod-fond" src="${esc(v.miniature)}" alt="" />` : ''}
+      <iframe src="${esc(avecAutoplay(v.cadre))}" title="Vidéo de ${esc(p.titre)}" referrerpolicy="no-referrer" allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write" allowfullscreen></iframe>
+    </div>
+    <div class="vod-aide">${icone('lecture', { taille: 14 })}<span>La lecture vient de ${esc(v.etiquette)} : ça compte sur ton forfait.</span><a href="${esc(v.page)}" target="_blank" rel="noopener">Ouvrir sur ${esc(v.etiquette)}</a></div>
+  </div>`);
+  document.body.appendChild(m);
+  const surTouche = (e) => { if (e.key === 'Escape') fermer(); };
+  const fermer = () => { m.remove(); document.removeEventListener('keydown', surTouche); };
+  m.addEventListener('click', (e) => {
+    if (e.target === m || e.target.closest('[data-x]')) fermer();
+  });
+  document.addEventListener('keydown', surTouche);
+  const btn = m.querySelector('.close');
+  if (btn) btn.focus();
+  Mesure.envoyer('lecture_video', p.id, v.fournisseur);
 }
 
 /* ---------------- loupe sur la photo ---------------- */

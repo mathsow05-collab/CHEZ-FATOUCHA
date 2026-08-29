@@ -44,6 +44,7 @@
     whatsapp: { cls: 'ico-whatsapp', svg: '<path data-cible="a" d="M20 12a8 8 0 0 1-11.8 7L4 20l1.1-4A8 8 0 1 1 20 12Z"/><path data-cible="b" d="M9.2 8.8c.4 2.6 3.4 5.6 6 6l1.2-1.6-1.9-1.1-1 .7c-1-.5-2-1.5-2.5-2.5l.7-1-1.1-1.9z"/>' },
     partager: { cls: 'ico-partager', svg: '<circle cx="17.6" cy="6.2" r="2.2"/><circle cx="6.4" cy="12" r="2.2"/><circle cx="17.6" cy="17.8" r="2.2"/><path data-cible="a" d="M8.4 10.9 15.6 7.2M8.4 13.1l7.2 3.7"/>' },
     zoom: { cls: 'ico-zoom', svg: '<circle data-cible="a" cx="11" cy="11" r="6.4"/><path d="M15.8 15.8 20 20M11 8.6v4.8M8.6 11h4.8"/>' },
+    lecture: { cls: 'ico-lecture', svg: '<circle cx="12" cy="12" r="8.6"/><path data-cible="a" d="M10.1 8.4 16 12l-5.9 3.6z"/>' },
     fleche: { cls: 'ico-fleche', svg: '<path data-cible="a" d="M4.6 12h14"/><path data-cible="b" d="m13.6 6.8 5.2 5.2-5.2 5.2"/>' },
     fleche_gauche: { cls: 'ico-fleche_gauche', svg: '<path data-cible="a" d="M19.4 12h-14"/><path data-cible="b" d="M10.4 6.8 5.2 12l5.2 5.2"/>' },
     bas: { cls: 'ico-bas', svg: '<path data-cible="a" d="M12 4.8v13"/><path data-cible="b" d="m6.6 12.6 5.4 5.4 5.4-5.4"/>' },

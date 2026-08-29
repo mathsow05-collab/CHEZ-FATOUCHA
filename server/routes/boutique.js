@@ -304,6 +304,9 @@ router.get('/pages/:slug', (req, res) => {
 const TYPES_EVENEMENTS = [
   'vue_fiche', 'ajout_panier', 'retrait_panier', 'ouverture_commande', 'paiement_engage',
   'commande_validee', 'recherche', 'clic_whatsapp', 'alerte_stock', 'avis_publie', 'zoom_photo', 'guide_tailles',
+  /* la vidéo d'un article lancée depuis la galerie : c'est ce qui prouve que le
+     lien collé dans l'espace vendeur sert à quelque chose */
+  'lecture_video',
 ];
 router.post('/evenements', rateLimiter({ max: 40, windowMs: 10 * 60_000, message: 'Trop d’événements.' }), (req, res) => {
   const seance = String(req.body?.seance || '').slice(0, 40);
