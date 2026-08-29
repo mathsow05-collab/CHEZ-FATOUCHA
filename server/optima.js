@@ -34,6 +34,14 @@ const FORMATS = {
 const CACHE_DIR = path.join(DATA_DIR, 'img-cache');
 fs.mkdirSync(CACHE_DIR, { recursive: true });
 
+/* Racine de hachage : un chemin RELATIF au dépôt, pour que la clé calculée
+   pendant la construction soit la même que celle du serveur qui tourne. */
+const REPO = path.join(__dirname, '..');
+/* Les variantes pré-cuites au build (`npm run build` → scripts/prepare-images.js)
+   sont lues ici, avant tout calcul : sur une instance qui vient de se réveiller,
+   la première visiteuse ne paie plus une seconde d'encodage. */
+const CACHE_BUILD = path.join(REPO, '.img-cache');
+
 /* Une seule instance de sharp, chargée paresseusement. */
 let _sharp;
 let _essayé = false;
@@ -80,8 +88,38 @@ function fichierSource(urlPublique) {
   return abs;
 }
 
-const cleDeCache = (abs, largeur, format = 'webp') =>
-  path.join(CACHE_DIR, crypto.createHash('sha1').update(abs + '@' + largeur + '@' + format).digest('hex') + '-' + largeur + '.' + format);
+/* Clé de cache. Elle est calculée sur le chemin RELATIF au dossier servi :
+   une variante cuite pendant la construction (dans un autre répertoire
+   d'installation) retrouve donc la même clé au moment de tourner. C'est ce qui
+   permet de pré-cuire les images au build et de ne rien calculer à la première
+   visite. `vers` = répertoire de sortie (cache d'exécution ou dépôt du build). */
+/* Chemin canonique de la source : indépendant du dossier d'installation, donc
+   la clé calculée au build est retrouvée par le serveur qui tourne. */
+function sourceCanonique(abs) {
+  const n = String(abs).split(path.sep).join('/');
+  const sous = (racine, etiquette) => {
+    const r = String(racine).split(path.sep).join('/');
+    return n.startsWith(r + '/') ? etiquette + n.slice(r.length) : null;
+  };
+  /* 1) les racines connues de cette machine ; 2) à défaut, le repère dans le
+     chemin — c'est ce qui rend la clé identique entre le répertoire du build et
+     celui du serveur quand ils ne portent pas le même préfixe. */
+  return sous(PUBLIC_DIR, 'public')
+    || sous(UPLOADS_DIR, 'uploads')
+    || ((() => {
+      const i = n.lastIndexOf('/public/');
+      if (i >= 0) return 'public/' + n.slice(i + '/public/'.length);
+      const j = n.lastIndexOf('/uploads/');
+      if (j >= 0) return 'uploads/' + n.slice(j + '/uploads/'.length);
+      return null;
+    })())
+    || ('fichier/' + path.basename(n));
+}
+
+const cleDeCache = (abs, largeur, format = 'webp', vers = CACHE_DIR) =>
+  path.join(vers,
+    crypto.createHash('sha1').update(sourceCanonique(abs) + '@' + largeur + '@' + format).digest('hex')
+    + '-' + largeur + '.' + format);
 
 /* Le format que le navigateur sait décoder (rien d'annoncé → WebP, sûr partout). */
 function formatAccepte(enteteAccept) {
@@ -95,12 +133,18 @@ const enCours = new Map();
 
 /* Produit (ou renvoie le chemin déjà en cache) le fichier redimensionné.
    Retourne { fichier, format, depuisCache } — ou null si rien n'est possible. */
-async function generer(abs, largeur, format = 'webp') {
+async function generer(abs, largeur, format = 'webp', options = {}) {
   const sharp = leModule();
   if (!sharp) return null;
   const demande = FORMATS[format] ? format : 'webp';
-  const cle = cleDeCache(abs, largeur, demande);
+  const vers = options.vers || CACHE_DIR;
+  const cle = cleDeCache(abs, largeur, demande, vers);
+  /* 1) déjà dans le cache d'exécution ; 2) pré-cuit au build ; 3) à calculer */
   if (fs.existsSync(cle)) return { fichier: cle, format: demande, depuisCache: true };
+  if (!options.vers) {
+    const cuite = cleDeCache(abs, largeur, demande, CACHE_BUILD);
+    if (fs.existsSync(cuite)) return { fichier: cuite, format: demande, depuisCache: true, depuis: 'build' };
+  }
   if (enCours.has(cle)) return enCours.get(cle);
   const t = (async () => {
     /* si l'encodage demandé échoue (libvips sans AV1, fichier piégé…), on
@@ -113,9 +157,10 @@ async function generer(abs, largeur, format = 'webp') {
           .toFormat(essai, { quality: FORMATS[essai].qualite, effort: FORMATS[essai].effort })
           .toBuffer();
         /* écriture atomique : pas de fichier à moitié lu par une autre requête */
-        const temp = cleDeCache(abs, largeur, essai) + '.' + process.pid + '.tmp';
+        const final = cleDeCache(abs, largeur, essai, vers);
+        const temp = final + '.' + process.pid + '.tmp';
+        fs.mkdirSync(path.dirname(final), { recursive: true });
         fs.writeFileSync(temp, tampon);
-        const final = cleDeCache(abs, largeur, essai);
         fs.renameSync(temp, final);
         return { fichier: final, format: essai, depuisCache: false };
       } catch (e) {
@@ -214,4 +259,4 @@ async function reduire(dir, nom, { largeurMax = 1200, qualite = 82 } = {}) {
   }
 }
 
-module.exports = { LARGEURS, FORMATS, disponible, peutOptimiser, fichierSource, generer, formatAccepte, urlPour, srcsetPour, baliseImage, route, reduire, echapperHtml };
+module.exports = { LARGEURS, FORMATS, disponible, peutOptimiser, fichierSource, generer, cleDeCache, sourceCanonique, formatAccepte, urlPour, srcsetPour, baliseImage, route, reduire, echapperHtml, CACHE_DIR, CACHE_BUILD };

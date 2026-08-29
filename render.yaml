@@ -13,7 +13,10 @@ services:
     plan: free
     region: frankfurt
     # L'application est à la racine du dépôt → aucun rootDir nécessaire.
-    buildCommand: npm install --omit=dev --no-audit --no-fund
+    # `images:prepare` pré-cuit les vignettes pendant la construction : sans ça,
+    # l'instance repart le cache vide à chaque réveil et la première visiteuse
+    # attend une seconde par photo (le disque de Render n'est pas persistant).
+    buildCommand: npm install --omit=dev --no-audit --no-fund && npm run images:prepare
     startCommand: node server/index.js
     healthCheckPath: /api/health
     # Node 20 = version testée, figée par le fichier .node-version à la racine

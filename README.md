@@ -233,6 +233,50 @@ L'admin touche **« ✔ Paiement reçu »** dans 📦 Commandes : la commande pa
 
 ---
 
+## Images : pourquoi les vignettes sont pré-cuites au build
+
+Les photos du site ne sont pas servies telles quelles : chaque visuel existe en
+220, 480, 900 et 1200 px, en AVIF et en WebP. Ces variantes sont calculées à la
+demande et rangées dans `DATA_DIR/img-cache`. Or le disque de Render est
+**éphémère** : à chaque réveil (et il dort dix minutes après la dernière visite),
+le cache est vide — la première visiteuse payait alors une seconde par photo,
+pendant que les suivantes ne voyaient rien du tout.
+
+Trois choses ont été faites :
+
+1. **`npm run images:prepare`** (joué par `buildCommand` sur Render, donc pendant
+   la construction) pré-cuit 220/480/900 px pour tous les visuels livrés, dans
+   `.img-cache/`. La clé de cache est calculée sur un chemin *relatif au dépôt* :
+   le serveur qui tourne dans un autre répertoire retrouve les mêmes fichiers.
+   Une variante déjà cuite est sautée → le build ne coûte que le premier coup
+   (~1 Mo, ~1 min).
+2. **Réchauffage au démarrage** (`server/rechauffage.js`) : ce que le build ne
+   peut pas connaître (photos téléversées, variants manquants) est fabriqué en
+   tâche de fond, deux à la fois, après l'ouverture du port — jamais devant une
+   requête. L'avancement est visible dans `GET /api/health` (`images`).
+3. **Preload** : la photo principale d'une fiche est annoncée dans le `<head>`
+   (`<link rel="preload" as="image">`), donc demandée en même temps que la
+   feuille de style. Les vignettes, elles, s'arrêtent à 480 px : elles sont
+   affichées à ~260 px, inutile de leur faire télécharger du 900 px.
+
+Réglages sans toucher au code : `RECHAUFFE=0` (désactive le réchauffage),
+`RECHAUFFE_NB` (nombre d'articles préparés, 16 par défaut), `RECHAUFFE_GRAND`
+(nombre de fiches ayant aussi leur grande photo, 8), `PRECUIRE="220,480"`
+(largeurs à pré-cuire si un build est trop long).
+
+Mesure sur cette machine, base de données et cache neufs à chaque scénario,
+mobile 390 px — « dernière photo » = millisecondes après le début du chargement
+jusqu'à la *dernière* image de la page :
+
+| scénario | accueil | fiche | boutique |
+| --- | --- | --- | --- |
+| rien de préparé (avant) | 4934 ms, une photo jamais arrivée | 3209 ms | 189 ms |
+| réchauffage seul | 6963 ms (course contre le visiteur) | 3844 ms | 130 ms |
+| pré-cuit au build | 155 ms | 145 ms | 115 ms |
+| pré-cuit + réchauffage | 174 ms | 132 ms | 130 ms |
+
+L'outil de mesure est `/home/user/tools/mesure-images.js` (hors dépôt) : il boot
+une instance par scénario, cache vide à chaque fois.
 ## 5. Photos et « lien de l'article »
 
 Le site est pensé pour que l'admin ajoute **ses propres articles** :
@@ -334,7 +378,7 @@ dans `render.yaml`). Alternative gratuite : sauvegarder régulièrement `data/fa
 npm run check:css    # 8 checks : thème (palette Prestige), variables réellement définies, aucun
                      # sélecteur mort (le CSS qui ne sert à rien est une dette), cloisonnement
                      # boutique / back-office
-npm run smoke        # 198 checks : catalogue, commande, stock par variante, paiement, admin, zones,
+npm run smoke        # 204 checks : catalogue, commande, stock par variante, paiement, admin, zones,
                      # sécurité ; rendu serveur + balisage + sitemap + robots ; polices réellement servies ; pipeline d'images
                      # (AVIF plus léger que WebP, cache disque, chemin tordu refusé) ; avis et
                      # modération ; alertes de retour en stock ; panier enregistré et reprise ;

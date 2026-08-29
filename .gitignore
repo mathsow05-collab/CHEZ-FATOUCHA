@@ -1,4 +1,6 @@
 # Dépendances
+# variantes d’images pré-cuites au build (artefact, jamais du code)
+.img-cache/
 node_modules/
 
 # Secrets & config locale

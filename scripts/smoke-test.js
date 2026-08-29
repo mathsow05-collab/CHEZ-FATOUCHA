@@ -397,6 +397,23 @@ const J = async (method, url, body, token) => {
     })());
     check('le srcset du catalogue pointe vers /img (et non les JPG plein format)', /\/img\/\d+\//.test((await J('GET', '/api/produits')).data[0]?.images?.[0]?.srcset || ''), (await J('GET', '/api/produits')).data[0]?.images?.[0]?.srcset);
 
+    /* --- ce que la cliente attend : les photos arrivent sans calcul --- */
+    const hFicheImg = await (await fetch(BASE + '/produit/' + slug)).text();
+    check('la photo principale de la fiche est préchargée dans le <head>', /<link rel="preload" as="image"[^>]*\/img\/900\//.test(hFicheImg), (hFicheImg.match(/<link rel="preload" as="image"[^>]*/) || ['absent'])[0].slice(0, 90));
+    const htmlAcc = await (await fetch(BASE + '/')).text();
+    const vignettes = (htmlAcc.match(/<img[^>]*>/g) || []).filter((b) => !/lookbook/.test(b));
+    check('les vignettes s’arrêtent à 480 px (le 900 est réservé à la photo de la fiche)', vignettes.length >= 4 && vignettes.every((b) => /\/img\/480\//.test(b) && !/\/img\/(900|1200)\//.test(b)), `${vignettes.length} vignettes · ${[...new Set(vignettes.join(' ').match(/\/img\/\d+\//g) || [])].join(' ')}`);
+    const optima = require('../server/optima');
+    check('la clé de cache ne dépend pas du dossier d’installation (le build sert au serveur)', (() => {
+      const a = optima.sourceCanonique('/home/x/CHEZ-FATOUCHA/public' + urlPhotoDemo);
+      const b = optima.sourceCanonique('/opt/build/repo/public' + urlPhotoDemo);
+      return a === b && a.startsWith('public/');
+    })(), optima.sourceCanonique('/opt/build/repo/public' + urlPhotoDemo.slice(7)));
+    check('le build pré-cuit les variantes (npm run build → scripts/prepare-images.js)', /prepare-images\.js/.test(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')) && fs.existsSync(path.join(__dirname, 'prepare-images.js')));
+    check('les variantes pré-cuites sont relues sans encodage', !fs.existsSync(optima.CACHE_BUILD) || (await fetch(`${BASE}/img/900${urlPhotoDemo}`, { headers: { accept: 'image/avif,*/*' } })).headers.get('x-image-cache') === 'disque', fs.existsSync(optima.CACHE_BUILD) ? 'dépôt présent' : 'dépôt absent (build non joué)');
+    const santeImg = await J('GET', '/api/health');
+    check('la santé du service dit où en la préparation des images', santeImg.data.images && typeof santeImg.data.images.total === 'number' && typeof santeImg.data.images.en_cours === 'boolean', JSON.stringify(santeImg.data.images));
+
     console.log('— Avis clientes : envoi, modération, réputation —');
     const sansAvis = (await J('GET', '/api/produits/' + p0.id)).data;
     check('note moyenne renvoyée avec le produit', sansAvis.avis && typeof sansAvis.avis.nombre === 'number', JSON.stringify(sansAvis.avis));

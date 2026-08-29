@@ -103,7 +103,7 @@ function carte(p) {
   const note = p.avis?.nombre ? `<span class="mini note-mini">${'★'.repeat(Math.round(p.avis.moyenne))} ${p.avis.moyenne} (${p.avis.nombre})</span>` : '';
   return `<article class="card" data-go="${ech(lien)}">
     <div class="ph squelette">
-      <a href="${ech(lien)}" tabindex="-1" aria-hidden="true">${optima.baliseImage(p.image, p.titre, { sizes: '(max-width:640px) 46vw, 300px' })}</a>
+      <a href="${ech(lien)}" tabindex="-1" aria-hidden="true">${optima.baliseImage(p.image, p.titre, { largeurs: [220, 480], sizes: '(max-width:640px) 46vw, 260px' })}</a>
       <div class="flags">${flags}</div>
     </div>
     <div class="body">
@@ -540,6 +540,15 @@ function pageHTML({ cfg, titre, description, url, image, type = 'website', prix 
   <link rel="stylesheet" href="/css/style.css" />
   <link rel="preload" href="/media/polices/fraunces-latin-standard-normal.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="/media/polices/manrope-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+  ${/* la photo que la fiche affiche tout de suite : le navigateur la demande en
+       même temps que le HTML, au lieu d'attendre que la feuille de style et le
+       script soient passés par là. Un seul preload par page, sinon le bandeau
+       de l'accueil se retrouve demandé deux fois. */
+    type === 'product' && image && !image.startsWith('http')
+      ? `<link rel="preload" as="image" href="${ech(optima.urlPour(image, 900))}" imagesrcset="${ech(optima.srcsetPour(image, [480, 900]))}" imagesizes="(max-width:900px) 94vw, 520px" fetchpriority="high" />`
+      : (type === 'website' && /\/$/.test(String(url || ''))
+        ? `<link rel="preload" as="image" href="/img/900/media/demo/lookbook.jpg" imagesrcset="/img/480/media/demo/lookbook.jpg 480w, /img/900/media/demo/lookbook.jpg 900w, /img/1200/media/demo/lookbook.jpg 1200w" imagesizes="(max-width:900px) 92vw, 460px" fetchpriority="high" />`
+        : '')}
   ${schema}
 </head>
 <body>

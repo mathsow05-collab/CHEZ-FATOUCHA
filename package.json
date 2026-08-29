@@ -13,7 +13,9 @@
     "test:front": "node scripts/front-test.js",
     "test": "npm run check:css && npm run smoke && npm run test:front",
     "demo:images": "node scripts/make-demo-images.js",
-    "check:css": "node scripts/check-css.js"
+    "check:css": "node scripts/check-css.js",
+    "build": "node scripts/check-css.js && node scripts/prepare-images.js",
+    "images:prepare": "node scripts/prepare-images.js"
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",

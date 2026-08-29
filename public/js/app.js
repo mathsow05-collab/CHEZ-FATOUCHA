@@ -137,7 +137,7 @@ function card(p, options = {}) {
   const photo = img(p);
   return `<article class="card${compact ? ' compact' : ''}${p.vedette && !compact ? ' ornee' : ''}" data-go="${esc(lien)}"${compact ? '' : ' data-reveal'}>
     <div class="ph glare squelette">
-      <a class="lien-ph" href="${esc(lien)}" data-spa tabindex="-1" aria-hidden="true">${baliseImg(photo, p.titre, { sizes: compact ? '220px' : '(max-width:640px) 46vw, 300px' })}</a>
+      <a class="lien-ph" href="${esc(lien)}" data-spa tabindex="-1" aria-hidden="true">${baliseImg(photo, p.titre, { largeurs: compact ? [220, 480] : [220, 480], sizes: compact ? '220px' : '(max-width:640px) 46vw, 260px' })}</a>
       <div class="flags">${flags}</div>
       <button class="cœur ${Favoris.contient(p.id) ? 'on' : ''}" data-fav="${p.id}" aria-label="${Favoris.contient(p.id) ? 'Retirer des favoris' : 'Garder dans mes favoris'}" title="Mes favoris">${icone("coeur", { taille: 17 })}</button>
     </div>

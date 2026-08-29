@@ -405,6 +405,7 @@ router.post('/produits/importer-url', async (req, res) => {
       echecs.push(e.message);
     }
   }
+  locales.forEach((n) => require('../rechauffage').apresUpload('/uploads/produits/' + n));
   addLog('import_url', { source: 'admin', ref: String(req.admin.username), details: `${url} -> ${locales.length} image(s)`, req });
   return res.json({
     titre: info.titre,
@@ -435,6 +436,7 @@ router.post('/images-from-url', async (req, res) => {
       erreurs.push(e.message || 'échec');
     }
   }
+  urls_ok.forEach((u) => require('../rechauffage').apresUpload(u));
   if (!urls_ok.length) return res.status(422).json({ error: 'Aucune image récupérée. ' + (erreurs[0] || ''), erreurs });
   return res.json({ urls: urls_ok, erreurs });
 });
@@ -472,6 +474,9 @@ router.post('/upload', upload.array('files', 10), async (req, res) => {
     gagner += Math.max(0, f.size - octets);
     urls.push(`/uploads/produits/${nom}`);
   }
+  /* les vignettes se préparent derrière la réponse : la fiche sera prête avant
+     la première visite, au lieu d'encoder pendant qu'elle attend */
+  urls.forEach((u) => require('../rechauffage').apresUpload(u));
   addLog('upload_images', { source: 'admin', ref: String(req.admin.username), details: urls.join(' ') });
   return res.json({ urls, economise_ko: Math.round(gagner / 1024) });
 });

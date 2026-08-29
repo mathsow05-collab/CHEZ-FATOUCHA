@@ -57,6 +57,9 @@ app.get('/api/health', (req, res) =>
     service: getSetting('nom_boutique', 'CHEZ FATOUCHA'),
     paiement: require('./paiement').mode(),
     date: new Date().toISOString(),
+    /* où en est la préparation des vignettes (voir server/rechauffage.js) : utile
+       pour comprendre pourquoi la toute première visite est plus lente */
+    images: require('./rechauffage').etatPublic(),
   })
 );
 
@@ -324,6 +327,9 @@ console.log(
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`✔ boutique en ligne sur le port ${PORT}`);
+  /* les variantes d'images se préparent DERMIÈRE l'ouverture du port : la
+     première visiteuse ne paie plus les conversions, et le serveur répond déjà */
+  if (process.env.RECHAUFFE !== '0') require('./rechauffage').lancer();
   console.log(`🔒 espace vendeur : http://localhost:${PORT}${CHEMIN_ADMIN} — aucun lien depuis la boutique, à ouvrir directement`);
 });
 
