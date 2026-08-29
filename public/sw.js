@@ -3,12 +3,18 @@
    encore le catalogue quand la connexion tombe. Rien d'automatique côté argent :
    les pages de commande, de paiement et le back-office ne sont jamais mis en
    cache, pour qu'aucune cliente ne voie un prix ou un stock périmé. */
-const VERSION = 'fatoucha-v4';
+const VERSION = 'fatoucha-v5';
 const MAX_IMG = 80;
 
 const JAMAIS = [/^\/api\/admin/, /^\/api\/commandes/, /^\/api\/paiement/, /^\/admin/, /\/(panier|commande|paiement)/];
-const RESEAU_DABORD = [/^\/$/, /^\/boutique/, /^\/produit\//, /^\/categorie\//, /^\/faq/, /^\/retours/, /^\/livraison/, /^\/a-propos/, /^\/api\/(config|produits|categories|zones|stats|pages)/];
-const CACHE_DABORD = [/^\/css\//, /^\/js\//, /^\/img\//, /^\/media\//, /^\/uploads\//, /^\/manifest\.webmanifest$/];
+const RESEAU_DABORD = [/^\/$/, /^\/boutique/, /^\/produit\//, /^\/categorie\//, /^\/faq/, /^\/retours/, /^\/livraison/, /^\/a-propos/, /^\/api\/(config|produits|categories|zones|stats|pages)/,
+  /* le code et la feuille : le réseau d'abord, le cache en filet. Les garder en
+     cache prioritaire, c'était se retrouver avec l'ancienne fiche après une
+     mise à jour — une fiche qui « n'affiche pas la vidéo » alors qu'elle y est.
+     Ces fichiers sont petits et le serveur répond vite ; une connexion perdue
+     reste couverte par le cache. */
+  /^\/js\//, /^\/css\//];
+const CACHE_DABORD = [/^\/img\//, /^\/media\//, /^\/uploads\//, /^\/manifest\.webmanifest$/];
 
 const estPour = (reg, url) => reg.some((r) => r.test(url));
 

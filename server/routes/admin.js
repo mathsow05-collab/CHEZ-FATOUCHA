@@ -505,15 +505,31 @@ router.post('/upload', upload.array('files', 10), async (req, res) => {
    Rien n'est enregistré ici : la fiche est écrite quand le formulaire est validé,
    et la miniature revient avec lui dans `video_miniature`. */
 router.post('/video-info', async (req, res) => {
-  const a = videos.analyser(req.body?.url);
+  const brut = String(req.body?.url || '').trim();
+  let a = videos.analyser(brut);
+  /* un lien raccourci (le « Partager » du téléphone) est déroulé ici : c'est le
+     seul moment où on attend quelqu'un d'autre, et c'est le vendeur qui le
+     déclenche. L'adresse complète repart dans le formulaire, donc ce qui est en
+     base est l'adresse stable, pas le raccourci. */
+  let resolution = null;
+  if (a.ok && a.fournisseur === 'raccourci') {
+    const r = await videos.resoudre(brut);
+    const second = videos.analyser(r.url);
+    if (second.ok && second.fournisseur !== 'raccourci') {
+      a = second;
+      resolution = r.url;
+    }
+  }
   if (!a.ok) return res.status(422).json({ error: a.erreur });
   const reponse = {
     ok: true,
+    url: a.page,
+    url_remplacee: resolution,
     fournisseur: a.fournisseur,
     etiquette: a.etiquette,
     page: a.page,
     format: a.format,
-    integrateur: a.local ? 'fichier' : 'cadre',
+    integrateur: a.local ? 'fichier' : a.cadre ? 'cadre' : 'lien',
     miniatures: [],
     miniature_site: null,
   };

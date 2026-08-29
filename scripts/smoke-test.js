@@ -423,12 +423,31 @@ const J = async (method, url, body, token) => {
       const r = await J('POST', '/api/admin/video-info', { url: lien }, tok);
       check(`le lien ${nom} est reconnu aussi`, r.data.ok && r.data.fournisseur === nom, JSON.stringify(r.data).slice(0, 80));
     }
+    /* le lien que le bouton « Partager » d’un téléphone fabrique : youtu.be/ID?si=…
+       c’est lui que les vendeuses collent, il doit donner un lecteur, pas un refus */
+    const vPartage = await J('POST', '/api/admin/video-info', { url: 'https://youtu.be/dQw4w9WgXcQ?si=Kj2xYz' }, tok);
+    check('le lien de partage téléphone (youtu.be + ?si=) est reconnu comme YouTube', vPartage.data.ok && vPartage.data.fournisseur === 'youtube' && vPartage.data.integrateur === 'cadre' && vPartage.data.url === 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', JSON.stringify(vPartage.data).slice(0, 90));
+    await J('PUT', '/api/admin/produits/' + p0.id, { video_url: 'https://youtu.be/dQw4w9WgXcQ?si=Kj2xYz' }, tok);
+    const partage = (await J('GET', '/api/produits/' + p0.id)).data;
+    check('et ce lien-là aboutit bien à un lecteur sur la fiche (pas une carte muette)', partage.video && /\/embed\/dQw4w9WgXcQ\?/.test(partage.video.cadre || ''), partage.video && partage.video.cadre);
+    await J('PUT', '/api/admin/produits/' + p0.id, { video_url: '' }, tok);
+    const vCourt = await J('POST', '/api/admin/video-info', { url: 'https://vm.tiktok.com/ZM6abcDe/' }, tok);
+    check('un lien raccourci est accepté mais annoncé comme non intégrable', vCourt.data.ok && vCourt.data.fournisseur === 'raccourci' && vCourt.data.integrateur === 'lien', JSON.stringify(vCourt.data).slice(0, 90));
+    await J('PUT', '/api/admin/produits/' + p0.id, { video_url: 'https://vm.tiktok.com/ZM6abcDe/' }, tok);
+    const ficheRaccourcie = await (await fetch(BASE + '/produit/' + p0.id)).text();
+    check('la fiche d’un lien raccourci reste propre : vignette, zéro cadre, et un vrai lien', /class="vod-cart"/.test(ficheRaccourcie) && !/<iframe/.test(ficheRaccourcie) && /href="https:\/\/vm\.tiktok\.com\//.test(ficheRaccourcie) && /chez le fournisseur/.test(ficheRaccourcie));
+    await J('PUT', '/api/admin/produits/' + p0.id, { video_url: '' }, tok);
     const vMauvais = await J('POST', '/api/admin/video-info', { url: 'https://n-importe-quoi.test/x' }, tok);
     check('un lien de n’importe où est refusé à l’aperçu (422)', vMauvais.status === 422, 'HTTP ' + vMauvais.status);
+    const swStrat = await (await fetch(BASE + '/sw.js')).text();
+    check('le code et la feuille ne sont plus servis depuis un cache prioritaire (sinon la fiche d’hier masque celle d’aujourd’hui)',
+      /\/\^\\\/js\\\//.test(swStrat.split('const CACHE_DABORD')[1] || '') === false
+      && /\/\^\\\/js\\\//.test((swStrat.split('const RESEAU_DABORD')[1] || '').split('const CACHE_DABORD')[0])
+      && /VERSION = 'fatoucha-v5'/.test(swStrat), swStrat.match(/VERSION = '[^']+'/)?.[0]);
     await J('PUT', '/api/admin/produits/' + p0.id, { video_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' }, tok);
     const avecVideo = (await J('GET', '/api/produits/' + p0.id)).data;
     check('l’objet video arrive à la fiche cliente', avecVideo.video && avecVideo.video.cadre && /^https:\/\/www\.youtube-nocookie\.com\/embed\//.test(avecVideo.video.cadre), avecVideo.video && avecVideo.video.cadre);
-    check('la miniature vient du site ou du fournisseur, jamais d’un traqueur', !avecVideo.video.miniature || /^(\/uploads\/\/img\/|https:\/\/i\.ytimg\.com\/)/.test(avecVideo.video.miniature), avecVideo.video.miniature);
+    check('la miniature vient du site ou du fournisseur, jamais d’un traqueur', !avecVideo.video.miniature || /^(\/uploads\/|\/img\/|https:\/\/i\.ytimg\.com\/)/.test(avecVideo.video.miniature), avecVideo.video.miniature);
     /* le guide des tailles est un objet, pas une liste : c'est le champ qui sautait
        en premier quand une mise à jour n'envoyait que le prix ou le lien vidéo */
     await J('PUT', '/api/admin/produits/' + p0.id, { guide_tailles: { M: { poitrine: 90, taille: 72, hanches: 96, longueur: 134 } }, mannequin: 'Portée par Awa.' }, tok);

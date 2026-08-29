@@ -227,7 +227,7 @@ async function vueProduits(body) {
       <td class="small">${esc(p.categorie || '—')}</td>
       <td><button class="btn sm ${p.actif ? 'ghost' : ''}" data-toggle="${p.id}" data-k="actif" data-v="${p.actif ? 0 : 1}">${p.actif ? '✔ en ligne' : 'masqué'}</button></td>
       <td><button class="btn sm ${p.vedette ? 'gold' : 'ghost'}" data-toggle="${p.id}" data-k="vedette" data-v="${p.vedette ? 0 : 1}">★</button></td>
-      <td class="row" style="gap:4px"><button class="btn sm ghost" data-edit="${p.id}">✏️</button><button class="btn sm danger" data-del="${p.id}">🗑</button></td>
+      <td class="row" style="gap:4px"><button class="btn sm ghost" data-edit="${p.id}" aria-label="Modifier « ${esc(p.titre)} »" title="Modifier">${icone('crayon', { taille: 15 })}</button><button class="btn sm danger" data-del="${p.id}" aria-label="Désactiver « ${esc(p.titre)} »" title="Désactiver">${icone('poubelle', { taille: 15 })}</button></td>
     </tr>`).join('')}</tbody></table></div>`
     : '<div class="bloc empty"><div class="big">👗</div><b>Aucun article.</b><br>Crée ton premier article : titre, prix, photo, tailles, stock.</div>'}
   <div class="banner">💡 Astuce : si tu as la fiche de l’article en ligne, ouvre « Nouvel article → Récupérer depuis une URL » pour récupérer la photo automatiquement, puis corrige prix et tailles.</div>`;
@@ -433,11 +433,18 @@ async function formProduit(p) {
     sortieVideo.textContent = 'Lecture du lien…';
     try {
       const r = await aReq('POST', '/api/admin/video-info', { url: brut });
-      const format = r.format === 'vertical' ? 'format vertical (9:16)' : r.format === 'libre' ? 'fichier lu directement' : 'format paysage (16:9)';
-      sortieVideo.innerHTML = `<span class="tag payee">${esc(r.etiquette)}</span> ${esc(format)} · ${r.integrateur === 'cadre' ? 'lecteur intégré au toucher' : 'fichier du site'}${r.miniature_site ? ' · miniature recopiée ✔' : ''}`
+      const format = r.format === 'vertical' ? 'format vertical (9:16)' : r.format === 'libre' ? (r.integrateur === 'lien' ? 'lien externe' : 'fichier lu directement') : 'format paysage (16:9)';
+      const facon = r.integrateur === 'cadre' ? 'lecteur intégré au toucher' : r.integrateur === 'lien' ? 'la fiche mettra un bouton qui ouvre la vidéo chez le fournisseur' : 'fichier du site';
+      sortieVideo.innerHTML = `<span class="tag ${r.integrateur === 'lien' ? 'nouvelle' : 'payee'}">${esc(r.etiquette)}</span> ${esc(format)} · ${esc(facon)}${r.miniature_site ? ' · miniature recopiée ✔' : ''}`
         + (r.miniature_site ? ` <button class="btn sm ghost" type="button" id="f-video-phot">Utiliser la miniature comme photo</button>` : '')
         + (r.avertissement ? `<br><span class="small muted">${esc(r.avertissement)}</span>` : '');
       f.querySelector('#f-video-mini').value = r.miniature_site || '';
+      /* le lien raccourci du téléphone est remplacé par l'adresse complète :
+         c'est elle qui est solide, et c'est elle que le site sait intégrer */
+      if (r.url_remplacee) {
+        champVideo.value = r.url_remplacee;
+        sortieVideo.innerHTML += ' <span class="small muted">· lien raccourci déroulé en lien complet ✔</span>';
+      }
       const bout = f.querySelector('#f-video-phot');
       if (bout) bout.addEventListener('click', () => {
         if (imgs.some((im) => im.url === r.miniature_site)) return toast('Elle est déjà dans les photos.', 'ko');

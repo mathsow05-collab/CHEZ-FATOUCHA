@@ -137,7 +137,11 @@ function blocVideo(p, images) {
   const v = p.video;
   if (!v) return '';
   const repli = (images[0] && images[0].url) || '/media/demo/robe-boheme.svg';
-  const vignette = optima.baliseImage(v.miniature || repli, '', { largeurs: [220, 480], sizes: '(max-width:640px) 92vw, 420px', cls: 'vod-img', repli });
+  /* aucune miniature réelle (lien raccourci, Vimeo…) : on ne remet pas la photo du
+     produit à côté d'elle-même. Un sceau sombre avec la lecture suffit. */
+  const vignette = v.miniature
+    ? optima.baliseImage(v.miniature, '', { largeurs: [220, 480], sizes: '(max-width:640px) 92vw, 420px', cls: 'vod-img', repli })
+    : '';
   /* un fichier déposé sur le site : le lecteur du dépôt suffit, pas de cadre tiers */
   if (v.fichier) {
     return `<div class="video-box"><video controls playsinline preload="none" poster="${ech(v.miniature || repli)}" src="${ech(v.fichier)}"></video>
@@ -146,10 +150,12 @@ function blocVideo(p, images) {
   /* un lien qu'on sait intégrer : la vignette s'ouvre en grand au toucher.
      Le lien pointe aussi vers l'original — pour celles et ceux qui n'ont pas de
      JavaScript, ou une connexion trop mauvaise pour un cadre. */
+  const marque = v.cadre ? ech(v.etiquette) : 'chez le fournisseur';
+  const facon = v.cadre ? 'au toucher' : 's’ouvre dans un onglet';
   return `<a class="vod-cart" href="${ech(v.page)}" target="_blank" rel="noopener" data-vod
-     aria-label="Lire la vidéo de l’article (${ech(v.etiquette)})">
+     aria-label="Lire la vidéo de l’article (${marque})">
     <span class="vod-mini">${vignette}<span class="vod-play">${icone('lecture', { taille: 15 })}</span></span>
-    <span class="vod-legende">Vidéo de l’article · ${ech(v.etiquette)}<span class="vod-duree">au toucher</span></span>
+    <span class="vod-legende">Vidéo de l’article · ${marque}<span class="vod-duree">${facon}</span></span>
   </a>`;
 }
 

@@ -77,6 +77,58 @@ const FOURNISSEURS = [
 
 const FOURNISSEUR_PAR_NOM = new Map(FOURNISSEURS.map((f) => [f.nom, f]));
 
+/* Les raccourcisseurs : ce que le bouton « Partager » d'un téléphone produit, au
+   lieu de l'adresse longue. On ne sait pas encore ce qu'il y a derrière — donc on
+   l'accepte comme simple lien (jamais comme cadre), et `resoudre` ci-dessous va
+   chercher l'adresse complète pour que la fiche puisse intégrer le lecteur. */
+const RACCOURCIS = /^(?:(?:www\.|vm\.|vt\.|m\.)tiktok\.com\/t?\/?[A-Za-z0-9_-]{5,}\b|(?:www\.)?(?:bit\.ly|cutt\.ly|t\.co|tinyurl\.com|is\.gd|rb\.gy|buff\.ly|yi\.se|ow\.ly|shorturl\.at|tly\.io|trib\.mn|rebrand\.ly)\/[^\s]+)/i;
+
+/* Un lien n'est traité comme un raccourci que si aucun fournisseur ne l'a
+   reconnu avant : `youtu.be/ID?si=…` est déjà une adresse complète. */
+const estRaccourci = (url) => RACCOURCIS.test(String(url || '').replace(/^https?:\/\//i, ''));
+
+/**
+ * Déroule un lien raccourci jusqu'à sa vraie adresse (3 sauts maximum), pour
+ * reconnaître le fournisseur. Silencieux sur l'échec : le lien collé reste
+ * utilisable comme lien, simplement sans lecteur intégré.
+ */
+async function resoudre(lien, { sauts = 3 } = {}) {
+  const brut = String(lien || '').trim();
+  if (!/^https?:\/\//i.test(brut)) return { url: brut, ok: false };
+  const { verifHote } = require('./scrape');
+  let courant = brut;
+  /* une adresse « utilisable » = un fournisseur reconnu ; pas simplement « autre chose » */
+  const pret = (x) => { const r = analyser(x); return r.ok && r.fournisseur !== 'raccourci'; };
+  for (let i = 0; i < sauts; i++) {
+    if (pret(courant)) return { url: courant, ok: true, change: courant !== brut };
+    try { u = new URL(courant); } catch { return { url: courant, ok: false }; }
+    try { await verifHote(u); } catch { return { url: courant, ok: false }; }
+    const ctrl = new AbortController();
+    const montre = setTimeout(() => ctrl.abort(), 8000);
+    try {
+      const res = await fetch(u.toString(), { redirect: 'manual', signal: ctrl.signal, headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ChezFatoucha/1.0)' } });
+      const loc = res.headers.get('location');
+      if ([301, 302, 303, 307, 308].includes(res.status) && loc) {
+        courant = new URL(loc, u).toString();
+        continue;
+      }
+      /* certains partagent une page HTML qui contient la vraie adresse : on la lit
+         une fois, sans charger le reste */
+      if (res.ok) {
+        const extrait = /"url":"(https:\/\/www\.(?:youtube|tiktok|instagram)\.com\/[^"]+)"/.exec(await res.text().catch(() => ''))
+          || /property="og:video:url" content="(https:[^"]+)"/.exec(await res.text().catch(() => ''));
+        if (extrait) { courant = extrait[1].replace(/\\u0026/g, '&'); continue; }
+      }
+      return { url: courant, ok: pret(courant), change: pret(courant) ? courant !== brut : false };
+    } catch {
+      return { url: courant, ok: false };
+    } finally {
+      clearTimeout(montre);
+    }
+  }
+  return { url: courant, ok: pret(courant), change: pret(courant) ? courant !== brut : false };
+}
+
 /**
  * @param {string} lien ce qui a été collé dans le champ « vidéo »
  * @returns {{ok:boolean, local?:boolean, erreur?:string, fournisseur?:string,
@@ -109,6 +161,12 @@ function analyser(lien) {
     return { ok: false, erreur: 'Seuls les liens http(s) sont acceptés.' };
   }
 
+  /* un lien raccourci est un lien honnête : on l'enregistre, on l'affiche, mais
+     on n'en fait jamais un cadre — on ne sait pas ce qu'il deviendra. */
+  if (estRaccourci(u.hostname + u.pathname + u.search)) {
+    return { ok: true, fournisseur: 'raccourci', etiquette: 'lien raccourci', page: brut, format: 'libre' };
+  }
+
   for (const f of FOURNISSEURS) {
     if (!f.hotes.test(u.hostname)) continue;
     const id = f.id(u);
@@ -125,6 +183,11 @@ function analyser(lien) {
     };
   }
 
+  /* reste le lien raccourci : honnête, on l'enregistre et on l'affiche, mais on
+     n'en fait jamais un cadre — on ne sait pas ce qu'il devient. */
+  if (estRaccourci(u.hostname + u.pathname + u.search + u.hash)) {
+    return { ok: true, fournisseur: 'raccourci', etiquette: 'lien raccourci', page: brut, format: 'libre' };
+  }
   return { ok: false, erreur: 'Lien non reconnu : YouTube, YouTube Shorts, Vimeo, TikTok ou Instagram — ou un fichier .mp4 déposé sur le site.' };
 }
 
@@ -142,4 +205,4 @@ function cadreAutorise(url) {
   }
 }
 
-module.exports = { analyser, cadreAutorise, FOURNISSEURS, FOURNISSEUR_PAR_NOM };
+module.exports = { analyser, resoudre, estRaccourci, cadreAutorise, FOURNISSEURS, FOURNISSEUR_PAR_NOM };
